@@ -1,6 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 
+// Routes that require a signed-in user. Reports themselves are public.
+const PROTECTED_PREFIXES = ['/dashboard', '/reports/new']
+const AUTH_ROUTES = ['/login', '/register']
+
 export async function updateSession(request) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -29,17 +33,20 @@ export async function updateSession(request) {
 
   const { pathname } = request.nextUrl
 
-  // Block unauthenticated users from protected routes
-  if (!user && pathname.startsWith('/dashboard')) {
+  // Block unauthenticated users from protected routes, remembering where they were going.
+  if (!user && PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.search = ''
+    url.searchParams.set('next', pathname)
     return NextResponse.redirect(url)
   }
 
-  // Redirect already-logged-in users away from auth pages
-  if (user && (pathname === '/login' || pathname === '/register')) {
+  // Redirect already-logged-in users away from the auth pages.
+  if (user && AUTH_ROUTES.includes(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 

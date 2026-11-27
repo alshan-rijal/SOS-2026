@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Sajha Pahal
 
-## Getting Started
+A community problem-reporting platform: residents report local infrastructure
+problems (potholes, drainage, waste, water, streetlights), confirm each other's
+reports, and follow every problem from *pending* to *resolved* on a live map.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+| | |
+|---|---|
+| Framework | Next.js 16 (App Router, Cache Components) |
+| UI | React 19, Tailwind CSS 4, [Lucide](https://lucide.dev) icons |
+| Data | Supabase (Postgres, Auth, Storage) |
+| Maps | Leaflet via `react-leaflet`, OpenStreetMap tiles |
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+1. Install dependencies:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   npm install
+   ```
 
-## Learn More
+2. Create `.env.local` with the project's public API credentials
+   (Supabase → Project Settings → API):
 
-To learn more about Next.js, take a look at the following resources:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key>
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   Only ever use the publishable/anon key in this app. The service-role key must
+   never be present in the client bundle.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. Apply the database schema — Supabase → **SQL Editor** → paste the contents of
+   [`supabase/schema.sql`](supabase/schema.sql) → Run.
 
-## Deploy on Vercel
+   This creates the `reports`, `report_status_history` and `report_verifications`
+   tables, the `report_category_counts` view, the `report-images` storage bucket,
+   indexes, and the row-level-security policies the app relies on.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+4. Optional — load example records so the dashboard and map are not empty:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   paste [`supabase/seed.sql`](supabase/seed.sql) into the SQL Editor and run it.
+
+5. Start the dev server:
+
+   ```bash
+   npm run dev
+   ```
+
+## Scripts
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm run start` | Serve the production build |
+| `npm run lint` | ESLint |
+
+## Routes
+
+| Route | Access | Purpose |
+|---|---|---|
+| `/` | Public | Landing page |
+| `/map` | Public | All located reports on a map |
+| `/reports` | Public | Searchable, filterable, paginated report list |
+| `/reports/[id]` | Public | Report details, photo, map, status timeline |
+| `/reports/new` | Signed in | Submit a report (photo + map pin) |
+| `/dashboard` | Signed in | Totals, recent reports, map, category breakdown |
+| `/login`, `/register`, `/forgot-password`, `/reset-password` | Public | Authentication |
+
+## Data rules
+
+Reports are civic records, so the RLS policies in `supabase/schema.sql` allow
+**anyone to read** them and **only signed-in users to write**:
+
+- create a report (`user_id = auth.uid()`),
+- update or delete their own report,
+- add a status-history entry to their own report,
+- verify any report once (`report_verifications` has a composite primary key),
+- upload to the public `report-images` bucket.
+
+Route protection lives in [`proxy.js`](proxy.js) →
+[`lib/supabase/middleware.js`](lib/supabase/middleware.js).
