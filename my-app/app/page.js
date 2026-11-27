@@ -731,7 +731,7 @@ export default function Home() {
 
           <div className="pt-8 border-t border-[#eaf4fb]/10 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-xs text-[#eaf4fb]/50">
-              © {new Date().getFullYear()} Lifeline. All rights reserved.
+              © Lifeline. All rights reserved.
             </p>
             <p className="text-xs text-[#eaf4fb]/50">
               Made with care for our community.
