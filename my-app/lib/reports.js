@@ -1,0 +1,93 @@
+// Shared seed reports + severity styling for the dashboard and full map pages.
+export const ITAHARI_CENTER = { lat: 26.6646, lng: 87.2718 }
+
+export const SEVERITY_CONFIG = {
+  critical: {
+    label: 'Critical',
+    pinColor: '#e11d48',
+    badgeBg: 'bg-rose-100 text-rose-800 ring-rose-300',
+  },
+  high: {
+    label: 'High',
+    pinColor: '#ff6b5a',
+    badgeBg: 'bg-[#ff6b5a]/15 text-[#c83e2b] ring-[#ff6b5a]/40',
+  },
+  medium: {
+    label: 'Medium',
+    pinColor: '#d97706',
+    badgeBg: 'bg-amber-100 text-amber-800 ring-amber-300',
+  },
+  low: {
+    label: 'Low',
+    pinColor: '#0284c7',
+    badgeBg: 'bg-sky-100 text-sky-800 ring-sky-300',
+  },
+}
+
+export const INITIAL_REPORTS = [
+  {
+    id: 'rep-1',
+    title: 'Deep pothole near Main Chowk intersection',
+    category: 'Road & Potholes',
+    severity: 'critical',
+    location: 'Itahari Chowk, Ward 5',
+    coords: { lat: 26.6646, lng: 87.2718 },
+    time: '18 mins ago',
+    author: 'Aarav S.',
+    verifications: 11,
+    verifiedByMe: false,
+    description: 'Large water-filled pothole blocking the northbound lane; two bikes slipped this morning.',
+  },
+  {
+    id: 'rep-2',
+    title: 'Broken asphalt & exposed drainage grate',
+    category: 'Road & Potholes',
+    severity: 'high',
+    location: 'Dharan Road, Ward 5',
+    coords: { lat: 26.671, lng: 87.2735 },
+    time: '1 hour ago',
+    author: 'Nisha K.',
+    verifications: 7,
+    verifiedByMe: false,
+    description: 'Metal grate cover is dislodged and road edge has collapsed along the school route.',
+  },
+  {
+    id: 'rep-3',
+    title: 'Severe road subsidence after overnight rain',
+    category: 'Road & Potholes',
+    severity: 'high',
+    location: 'Biratnagar Line, Ward 4',
+    coords: { lat: 26.658, lng: 87.272 },
+    time: '2 hours ago',
+    author: 'Rohan T.',
+    verifications: 9,
+    verifiedByMe: false,
+    description: 'Surface cracking across half the street width making ambulance access difficult.',
+  },
+  {
+    id: 'rep-4',
+    title: 'Overflowing community waste bin',
+    category: 'Waste Management',
+    severity: 'medium',
+    location: 'Khanar, Ward 3',
+    coords: { lat: 26.635, lng: 87.2705 },
+    time: '4 hours ago',
+    author: 'Sita M.',
+    verifications: 4,
+    verifiedByMe: false,
+    description: 'Garbage has not been collected for 3 days and is spilling onto the pedestrian sidewalk.',
+  },
+  {
+    id: 'rep-5',
+    title: 'Streetlight flickering near community park',
+    category: 'Electricity',
+    severity: 'low',
+    location: 'Tarahara, Ward 2',
+    coords: { lat: 26.701, lng: 87.276 },
+    time: '6 hours ago',
+    author: 'Bikash G.',
+    verifications: 2,
+    verifiedByMe: false,
+    description: 'Pole #14 LED light keeps cutting out every few minutes after dusk.',
+  },
+]
