@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import FrameImg from './Frame.png'
+import FrameImg from './business-images/Frame.png'
 
 export default function Home() {
   return (
