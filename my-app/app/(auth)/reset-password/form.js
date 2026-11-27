@@ -63,7 +63,7 @@ export default function ResetPasswordForm() {
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             href="/forgot-password"
-            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
+            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
           >
             Request a new link
           </Link>
@@ -82,13 +82,13 @@ export default function ResetPasswordForm() {
     return (
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Password updated</h1>
-        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-800">
-          <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-ink/20 bg-ink/5 p-3.5 text-sm text-ink">
+          <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
           Your password has been changed. You can now use it to sign in.
         </div>
         <Link
           href="/dashboard"
-          className="mt-6 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
+          className="mt-6 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
         >
           Go to dashboard
         </Link>
@@ -104,8 +104,8 @@ export default function ResetPasswordForm() {
       </p>
 
       {serverError ? (
-        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-3.5 text-sm text-ink">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
           {serverError}
         </div>
       ) : null}
@@ -128,14 +128,14 @@ export default function ResetPasswordForm() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? 'Updating…' : 'Update password'}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm">
-        <Link href="/login" className="font-semibold text-accent-strong hover:underline">
+        <Link href="/login" className="font-semibold text-ink hover:underline">
           Back to sign in
         </Link>
       </p>

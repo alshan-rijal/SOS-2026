@@ -3,15 +3,14 @@
 /* ---------------------------------------------------------------------------
    Design tokens — one palette for the whole app.
    Ink (navy) carries structure, accent (coral) carries action, surface is the
-   page canvas. All shades of ink/white come from opacity modifiers so no new
-   colors creep in.
+   page canvas. Soft tints come from opacity modifiers on ink/accent, so no
+   colour outside #eaf4fb / #0b4a6f / #ff6b5a / #ffffff ever enters the UI.
 --------------------------------------------------------------------------- */
 @theme {
   --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
 
   --color-ink: #0b4a6f;
   --color-accent: #ff6b5a;
-  --color-accent-strong: #f2503d;
   --color-surface: #eaf4fb;
 }
 
@@ -83,20 +82,169 @@
 }
 
 .leaflet-popup-content-wrapper {
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgb(11 74 111 / 0.18);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgb(11 74 111 / 0.2);
 }
 
 .leaflet-popup-content {
   margin: 14px 16px;
   font-size: 13px;
   line-height: 1.5;
+  max-width: calc(100vw - 5rem);
 }
 
 .leaflet-popup-tip {
-  box-shadow: 0 8px 24px rgb(11 74 111 / 0.18);
+  box-shadow: 0 12px 32px rgb(11 74 111 / 0.2);
 }
 
 .leaflet-bar a {
   color: var(--color-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   Map pins — teardrop divIcons built with inline SVG (no image files).
+   Drop-in plays once on mount, a soft pulse runs for high/critical pins, and
+   selecting a pin bounces it once. All motion is disabled by the
+   prefers-reduced-motion rule above.
+--------------------------------------------------------------------------- */
+.sos-pin-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.sos-pin {
+  position: relative;
+  display: block;
+  width: var(--pin-size);
+  height: var(--pin-h);
+  filter: drop-shadow(0 4px 6px rgba(11, 74, 111, 0.35));
+  transform-origin: 50% 100%;
+  transition: transform 150ms ease;
+}
+
+.sos-pin svg {
+  display: block;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+.sos-pin-dot {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  width: calc(var(--pin-size) * 0.32);
+  height: calc(var(--pin-size) * 0.32);
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  background: #ffffff;
+}
+
+.leaflet-marker-icon:hover .sos-pin {
+  transform: scale(1.15);
+}
+
+.sos-pin.is-enter {
+  animation: pin-drop 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--pin-index, 0) * 45ms);
+}
+
+.sos-pin.is-active {
+  animation: pin-bounce 420ms ease;
+}
+
+.sos-pin.is-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -22%;
+  border-radius: 9999px;
+  background: rgba(255, 107, 90, 0.28);
+  z-index: 0;
+  animation: pin-pulse 2200ms ease-out infinite;
+}
+
+@keyframes pin-drop {
+  0% {
+    transform: translateY(-140%) scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(0) scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pin-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-38%) scale(1.06);
+  }
+  70% {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+@keyframes pin-pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* Slow pulsing outer ring around the hotspot cell. */
+.hotspot-ring {
+  animation: hotspot-pulse 2600ms ease-out infinite;
+}
+
+@keyframes hotspot-pulse {
+  0% {
+    stroke-opacity: 0.85;
+    stroke-width: 3;
+  }
+  100% {
+    stroke-opacity: 0;
+    stroke-width: 14;
+  }
+}
+
+/* Small coral label pinned to the highest-problem area. */
+.leaflet-tooltip.sos-hotspot-label {
+  background: #ff6b5a;
+  color: #ffffff;
+  border: 0;
+  border-radius: 9999px;
+  padding: 3px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(11, 74, 111, 0.28);
+}
+
+.leaflet-tooltip.sos-hotspot-label::before {
+  border-top-color: #ff6b5a;
+  border-bottom-color: #ff6b5a;
+  border-left-color: #ff6b5a;
+  border-right-color: #ff6b5a;
+}
+
+/* ---------------------------------------------------------------------------
+   Shared surface utilities — one card shape for the whole app.
+--------------------------------------------------------------------------- */
+@layer components {
+  .card {
+    border-radius: 1rem;
+    border: 1px solid rgba(11, 74, 111, 0.12);
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(11, 74, 111, 0.05), 0 10px 28px rgba(11, 74, 111, 0.06);
+  }
 }

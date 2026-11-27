@@ -3,14 +3,16 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { FileText, LayoutDashboard, LogOut, Map, Menu, Plus, X } from 'lucide-react'
+import { FileText, LayoutDashboard, LogOut, Map, Menu, Plus, User, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Logo from '@/components/Logo'
+import Avatar from '@/components/Avatar'
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/reports', label: 'Reports', icon: FileText },
   { href: '/map', label: 'Map', icon: Map },
+  { href: '/profile', label: 'Profile', icon: User },
 ]
 
 function isActivePath(pathname, href) {
@@ -94,6 +96,7 @@ export default function AppHeader() {
   const supabase = createClient()
 
   const [userName, setUserName] = useState('')
+  const [userAvatar, setUserAvatar] = useState('')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
@@ -107,15 +110,17 @@ export default function AppHeader() {
       if (!active) return
       if (!user) {
         setUserName('')
+        setUserAvatar('')
         return
       }
       const { data: profile } = await supabase
         .from('profiles')
-        .select('full_name')
+        .select('full_name, avatar_url')
         .eq('id', user.id)
         .maybeSingle()
       if (!active) return
       setUserName(profile?.full_name || user.email || 'Signed in')
+      setUserAvatar(profile?.avatar_url || user.user_metadata?.avatar_url || '')
     }
 
     loadUser()
@@ -144,12 +149,16 @@ export default function AppHeader() {
 
   const userActions = userName ? (
     <>
-      <span className="hidden max-w-[12rem] truncate text-xs font-medium text-ink/60 sm:inline">
-        {userName}
-      </span>
+      <Link
+        href="/profile"
+        className="hidden items-center gap-2 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-ink/5 sm:inline-flex"
+      >
+        <Avatar src={userAvatar} name={userName} size={26} />
+        <span className="max-w-[10rem] truncate text-xs font-medium text-ink/70">{userName}</span>
+      </Link>
       <Link
         href="/reports/new"
-        className="hidden items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-strong sm:inline-flex"
+        className="hidden items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90 sm:inline-flex"
       >
         <Plus className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
         Report issue
@@ -158,7 +167,7 @@ export default function AppHeader() {
         type="button"
         onClick={handleLogout}
         disabled={isLoggingOut}
-        className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink/60 transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50 sm:inline-flex"
+        className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink/60 transition-colors duration-150 hover:bg-ink/5 hover:text-ink disabled:opacity-50 sm:inline-flex"
       >
         <LogOut className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
         {isLoggingOut ? 'Signing out…' : 'Sign out'}
@@ -168,13 +177,13 @@ export default function AppHeader() {
     <>
       <Link
         href="/login"
-        className="hidden rounded-lg px-3 py-2 text-sm font-medium text-ink/70 transition-colors hover:bg-ink/5 hover:text-ink sm:inline-block"
+        className="hidden rounded-lg px-3 py-2 text-sm font-medium text-ink/70 transition-colors duration-150 hover:bg-ink/5 hover:text-ink sm:inline-block"
       >
         Sign in
       </Link>
       <Link
         href="/register"
-        className="hidden rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-strong sm:inline-block"
+        className="hidden rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90 sm:inline-block"
       >
         Create account
       </Link>
@@ -183,7 +192,7 @@ export default function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink/10 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4 sm:px-6 lg:px-8">
         <Logo />
 
         <Suspense fallback={<DesktopNavFallback />}>
@@ -211,7 +220,7 @@ export default function AppHeader() {
 
       {isMenuOpen ? (
         <div className="border-t border-ink/10 bg-white md:hidden">
-          <nav className="mx-auto max-w-6xl px-4 py-3 sm:px-6" aria-label="Mobile">
+          <nav className="mx-auto max-w-[1200px] px-4 py-3 sm:px-6" aria-label="Mobile">
             <MobileNav onNavigate={closeMenu} />
 
             <div className="mt-3 space-y-2 border-t border-ink/10 pt-3">
@@ -250,8 +259,7 @@ export default function AppHeader() {
                     className="rounded-lg bg-accent px-4 py-2.5 text-center text-sm font-semibold text-white"
                   >
                     Create account
-                  </Link>
-                </div>
+                  </Link>                </div>
               )}
             </div>
           </nav>

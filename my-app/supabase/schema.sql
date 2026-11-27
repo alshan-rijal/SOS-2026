@@ -175,7 +175,7 @@ create policy "Report images are publicly readable"
 
 create policy "Signed-in users can upload report images"
   on storage.objects for insert
-  to authenticated 
+  to authenticated  
   with check (bucket_id = 'report-images');
 
 create policy "Uploaders can replace their own report images"
@@ -187,3 +187,84 @@ create policy "Uploaders can delete their own report images"
   on storage.objects for delete
   to authenticated
   using (bucket_id = 'report-images' and owner = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- Profiles: public display data mirrored from auth.users.
+-- Anyone may read; only the owner may insert or update their own row. The app
+-- upserts { id, full_name, phone, ward, bio, avatar_url } on save.
+-- ---------------------------------------------------------------------------
+create table if not exists public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  full_name text not null default '',
+  phone text not null default '',
+  ward text not null default '',
+  bio text not null default '',
+  avatar_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Tolerate an older `profiles` table created before these columns existed.
+alter table public.profiles add column if not exists phone text not null default '';
+alter table public.profiles add column if not exists ward text not null default '';
+alter table public.profiles add column if not exists bio text not null default '';
+alter table public.profiles add column if not exists avatar_url text;
+
+drop trigger if exists profiles_touch_updated_at on public.profiles;
+create trigger profiles_touch_updated_at
+  before update on public.profiles
+  for each row execute function public.touch_updated_at();
+
+alter table public.profiles enable row level security;
+
+drop policy if exists "Profiles are publicly readable" on public.profiles;
+create policy "Profiles are publicly readable"
+  on public.profiles for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "Users can insert their own profile" on public.profiles;
+create policy "Users can insert their own profile"
+  on public.profiles for insert
+  to authenticated
+  with check (auth.uid() = id);
+
+drop policy if exists "Users can update their own profile" on public.profiles;
+create policy "Users can update their own profile"
+  on public.profiles for update
+  to authenticated
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
+
+grant select on public.profiles to anon, authenticated;
+grant insert, update on public.profiles to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Storage: profile avatars (public bucket, one folder per user id)
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Avatars are publicly readable" on storage.objects;
+create policy "Avatars are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
+drop policy if exists "Users can upload their own avatar" on storage.objects;
+create policy "Users can upload their own avatar"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "Users can update their own avatar" on storage.objects;
+create policy "Users can update their own avatar"
+  on storage.objects for update
+  to authenticated
+  using (bucket_id = 'avatars' and owner = auth.uid());
+
+drop policy if exists "Users can delete their own avatar" on storage.objects;
+create policy "Users can delete their own avatar"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'avatars' and owner = auth.uid());

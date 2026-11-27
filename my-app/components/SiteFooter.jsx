@@ -5,7 +5,7 @@ import Logo from '@/components/Logo'
 export default function SiteFooter() {
   return (
     <footer className="border-t border-ink/10 bg-white">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:items-start md:justify-between lg:px-8">
+      <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:items-start md:justify-between lg:px-8">
         <div>
           <Logo />
           <p className="mt-2 max-w-sm text-xs leading-relaxed text-ink/55">

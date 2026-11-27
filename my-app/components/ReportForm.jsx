@@ -73,7 +73,7 @@ export default function ReportForm() {
         .eq('id', current.id)
         .maybeSingle()
       if (!active) return
-      setReporterName(profile?.full_name || current.email || 'Anonymous')
+      setReporterName(profile?.full_name || current.user_metadata?.full_name || 'Anonymous')
       setUser(current)
     }
     loadUser()
@@ -216,7 +216,7 @@ export default function ReportForm() {
             { label: 'Report an issue' },
           ]}
         />
-        <div className="rounded-2xl bg-white p-8 text-center ring-1 ring-ink/10">
+        <div className="card p-6 text-center">
           <span className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-ink/5 text-ink/60">
             <LogIn className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
           </span>
@@ -228,7 +228,7 @@ export default function ReportForm() {
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
               href="/login"
-              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
+              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
             >
               Sign in
             </Link>
@@ -263,14 +263,14 @@ export default function ReportForm() {
       </div>
 
       {formError ? (
-        <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+        <div className="flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-ink">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
           {formError}
         </div>
       ) : null}
 
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
-        <section className="rounded-2xl bg-white p-5 ring-1 ring-ink/10 sm:p-6">
+        <section className="card p-6">
           <h2 className="mb-4 text-sm font-bold text-ink">Details</h2>
           <div className="space-y-4">
             <Field id="title" label="Report title" required error={errors.title}>
@@ -351,7 +351,7 @@ export default function ReportForm() {
           </div>
         </section>
 
-        <section className="rounded-2xl bg-white p-5 ring-1 ring-ink/10 sm:p-6">
+        <section className="card p-6">
           <h2 className="mb-4 text-sm font-bold text-ink">Location</h2>
           <div className="space-y-4">
             <Field
@@ -410,6 +410,7 @@ export default function ReportForm() {
                   picked={coords ?? ITAHARI_CENTER}
                   zoom={13}
                   showPopups={false}
+                  showAreas={false}
                   fitToReports={false}
                 />
               </div>
@@ -424,7 +425,7 @@ export default function ReportForm() {
           </div>
         </section>
 
-        <section className="rounded-2xl bg-white p-5 ring-1 ring-ink/10 sm:p-6">
+        <section className="card p-6">
           <h2 className="mb-1 text-sm font-bold text-ink">Photo</h2>
           <p className="mb-4 text-xs text-ink/50">
             One photo, up to 5 MB. JPG, PNG or WebP. {/* shortcut: one photo per
@@ -450,7 +451,7 @@ export default function ReportForm() {
           ) : (
             <label
               htmlFor="photo"
-              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/25 bg-ink/2 px-6 py-10 text-center transition-colors hover:border-accent hover:bg-accent/5"
+              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/25 bg-ink/5 px-6 py-10 text-center transition-colors hover:border-accent hover:bg-accent/5"
             >
               <ImagePlus className="h-6 w-6 text-ink/40" strokeWidth={1.8} aria-hidden="true" />
               <span className="text-sm font-medium text-ink">Choose a photo</span>
@@ -467,7 +468,7 @@ export default function ReportForm() {
           )}
         </section>
 
-        <div className="rounded-2xl bg-white p-5 ring-1 ring-ink/10 sm:p-6">
+        <div className="card p-6">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">
             <Info className="h-4 w-4 text-ink/40" strokeWidth={2} aria-hidden="true" />
             Before you submit
@@ -503,7 +504,7 @@ export default function ReportForm() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
             {isSubmitting ? 'Submitting…' : 'Submit report'}

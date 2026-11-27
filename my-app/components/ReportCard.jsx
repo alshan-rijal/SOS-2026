@@ -5,15 +5,15 @@ import { timeAgo } from '@/lib/reports'
 
 export default function ReportCard({ report, onVerify, isVerifying = false }) {
   return (
-    <article className="flex flex-col rounded-2xl bg-white p-5 ring-1 ring-ink/10 transition-shadow hover:shadow-md hover:shadow-ink/5">
+    <article className="card flex min-w-0 flex-col p-5 transition-shadow duration-150 hover:shadow-[0_12px_32px_rgba(11,74,111,0.12)]">
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <SeverityBadge severity={report.severity} />
         <StatusBadge status={report.status} />
-        <span className="ml-auto text-xs text-ink/45">{timeAgo(report.createdAt)}</span>
+        <span className="ml-auto text-xs text-ink/50">{timeAgo(report.createdAt)}</span>
       </div>
 
-      <h3 className="text-base font-semibold leading-snug text-ink">
-        <Link href={`/reports/${report.id}`} className="transition-colors hover:text-accent-strong">
+      <h3 className="break-words text-base font-semibold leading-snug text-ink">
+        <Link href={`/reports/${report.id}`} className="transition-colors duration-150 hover:text-accent">
           {report.title}
         </Link>
       </h3>
@@ -27,7 +27,7 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
       </p>
 
       {report.description ? (
-        <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-ink/65">
+        <p className="mt-3 line-clamp-2 break-words text-sm leading-relaxed text-ink/70">
           {report.description}
         </p>
       ) : null}
@@ -62,7 +62,7 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
 
           <Link
             href={`/reports/${report.id}`}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-accent-strong transition-colors hover:bg-accent/10"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-accent/10"
           >
             Details
             <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
@@ -75,15 +75,15 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
 
 export function ReportCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-2xl bg-white p-5 ring-1 ring-ink/10">
+    <div className="card animate-pulse p-5">
       <div className="mb-3 flex gap-2">
-        <div className="h-6 w-20 rounded-full bg-ink/10" />
-        <div className="h-6 w-24 rounded-full bg-ink/10" />
+        <div className="h-6 w-20 rounded-full bg-ink/8" />
+        <div className="h-6 w-24 rounded-full bg-ink/8" />
       </div>
-      <div className="h-4 w-3/4 rounded bg-ink/10" />
-      <div className="mt-2 h-3 w-1/2 rounded bg-ink/10" />
-      <div className="mt-3 h-3 w-full rounded bg-ink/10" />
-      <div className="mt-2 h-3 w-5/6 rounded bg-ink/10" />
+      <div className="h-4 w-3/4 rounded bg-ink/8" />
+      <div className="mt-2 h-3 w-1/2 rounded bg-ink/8" />
+      <div className="mt-3 h-3 w-full rounded bg-ink/8" />
+      <div className="mt-2 h-3 w-5/6 rounded bg-ink/8" />
     </div>
   )
 }

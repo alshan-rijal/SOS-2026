@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 
 // Routes that require a signed-in user. Reports themselves are public.
-const PROTECTED_PREFIXES = ['/dashboard', '/reports/new']
+const PROTECTED_PREFIXES = ['/dashboard', '/reports/new', '/profile']
 const AUTH_ROUTES = ['/login', '/register']
 
 export async function updateSession(request) {

@@ -69,8 +69,8 @@ export default function LoginForm() {
       </p>
 
       {serverError ? (
-        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-3.5 text-sm text-ink">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
           {serverError}
         </div>
       ) : null}
@@ -97,7 +97,7 @@ export default function LoginForm() {
             </label>
             <Link
               href="/forgot-password"
-              className="text-xs font-semibold text-accent-strong transition-colors hover:underline"
+              className="text-xs font-semibold text-ink transition-colors hover:underline"
             >
               Forgot password?
             </Link>
@@ -117,7 +117,7 @@ export default function LoginForm() {
               aria-describedby={errors.password ? 'password-error' : undefined}
               className={`w-full rounded-lg border bg-white px-3.5 py-2.5 pr-11 text-sm text-ink transition-colors placeholder:text-ink/40 focus:outline-none focus:ring-2 ${
                 errors.password
-                  ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+                  ? 'border-accent focus:border-accent focus:ring-accent/30'
                   : 'border-ink/15 focus:border-accent focus:ring-accent/30'
               }`}
             />
@@ -137,7 +137,7 @@ export default function LoginForm() {
           {errors.password ? (
             <p
               id="password-error"
-              className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600"
+              className="mt-1.5 flex items-center gap-1.5 text-xs text-ink"
             >
               <AlertCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
               {errors.password}
@@ -148,7 +148,7 @@ export default function LoginForm() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? 'Signing in…' : 'Sign in'}
         </button>
@@ -158,7 +158,7 @@ export default function LoginForm() {
 
       <p className="mt-6 text-center text-sm text-ink/60">
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="font-semibold text-accent-strong hover:underline">
+        <Link href="/register" className="font-semibold text-ink hover:underline">
           Create one
         </Link>
       </p>

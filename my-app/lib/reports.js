@@ -11,48 +11,55 @@ export const CATEGORIES = [
   'Drainage',
 ]
 
+// Every badge uses only the four palette colours: ink #0b4a6f, accent #ff6b5a,
+// surface #eaf4fb and white. `weight` drives the hotspot score; `pin` sizes and
+// fills the teardrop markers on the map.
 export const SEVERITY_CONFIG = {
   critical: {
     label: 'Critical',
-    pinColor: '#e11d48',
-    badge: 'bg-rose-50 text-rose-700 ring-rose-200',
-    dot: 'bg-rose-600',
+    weight: 4,
+    badge: 'bg-accent text-white border-accent',
+    dot: 'bg-white/70',
+    pin: { size: 38, fill: '#ff6b5a', border: '#0b4a6f', pulse: true },
   },
   high: {
     label: 'High',
-    pinColor: '#ff6b5a',
-    badge: 'bg-orange-50 text-orange-700 ring-orange-200',
-    dot: 'bg-[#ff6b5a]',
+    weight: 3,
+    badge: 'bg-accent text-white border-accent',
+    dot: 'bg-white/70',
+    pin: { size: 33, fill: '#ff6b5a', border: '#ffffff', pulse: true },
   },
   medium: {
     label: 'Medium',
-    pinColor: '#d97706',
-    badge: 'bg-amber-50 text-amber-700 ring-amber-200',
-    dot: 'bg-amber-500',
+    weight: 2,
+    badge: 'bg-ink text-white border-ink',
+    dot: 'bg-white/70',
+    pin: { size: 28, fill: '#0b4a6f', border: '#ffffff', pulse: false },
   },
   low: {
     label: 'Low',
-    pinColor: '#0284c7',
-    badge: 'bg-sky-50 text-sky-700 ring-sky-200',
-    dot: 'bg-sky-600',
+    weight: 1,
+    badge: 'bg-surface text-ink border-ink',
+    dot: 'bg-ink',
+    pin: { size: 23, fill: '#eaf4fb', border: '#0b4a6f', pulse: false },
   },
 }
 
 export const STATUS_CONFIG = {
   pending: {
     label: 'Pending',
-    badge: 'bg-amber-50 text-amber-700 ring-amber-200',
-    dot: 'bg-amber-500',
+    badge: 'bg-surface text-ink border-ink/30',
+    dot: 'bg-ink',
   },
   in_progress: {
     label: 'In Progress',
-    badge: 'bg-sky-50 text-sky-700 ring-sky-200',
-    dot: 'bg-sky-600',
+    badge: 'bg-ink text-white border-ink',
+    dot: 'bg-ink',
   },
   resolved: {
     label: 'Resolved',
-    badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    dot: 'bg-emerald-600',
+    badge: 'bg-white text-ink border-ink',
+    dot: 'bg-ink',
   },
 }
 
@@ -67,10 +74,20 @@ export const SORT_OPTIONS = [
 
 export const PAGE_SIZE = 9
 
+// Hotspot grouping and signal-alert distances.
+export const AREA_SIZE_METERS = 300
+export const AREA_RADIUS_METERS = 170
+export const SIGNAL_RADIUS_METERS = 500
+export const SIGNAL_MIN_REPORTS = 3
+
 const REPORT_SELECT =
   'id,user_id,title,description,category,severity,status,location_name,' +
   'latitude,longitude,image_url,reporter_name,created_at,updated_at,' +
   'report_verifications(count)'
+
+// `*` keeps profile reads working whether or not the optional columns
+// (phone, ward, bio, avatar_url) have been added by schema.sql yet.
+const PROFILE_SELECT = '*'
 
 // ---------------------------------------------------------------------------
 // Normalisation
@@ -105,6 +122,123 @@ export function hasCoords(report) {
     Math.abs(report.longitude) <= 180 &&
     !(report.latitude === 0 && report.longitude === 0)
   )
+}
+
+export function severityWeight(severity) {
+  return SEVERITY_CONFIG[severity]?.weight ?? 1
+}
+
+// ---------------------------------------------------------------------------
+// Client-side geography: distances, hotspot cells and signal clusters
+// ---------------------------------------------------------------------------
+
+const METERS_PER_DEG_LAT = 111320
+
+/** Straight-line metres between two {lat,lng} points (equirectangular). */
+export function metersBetween(a, b) {
+  const midLat = ((a.lat + b.lat) / 2) * (Math.PI / 180)
+  const dLat = (a.lat - b.lat) * METERS_PER_DEG_LAT
+  const dLng = (a.lng - b.lng) * METERS_PER_DEG_LAT * Math.cos(midLat)
+  return Math.hypot(dLat, dLng)
+}
+
+/** Most common non-empty location name in a set of reports, or a coordinate label. */
+function areaLabel(reports, center) {
+  const counts = new Map()
+  for (const report of reports) {
+    const name = (report.locationName || '').trim()
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+  let best = ''
+  let bestCount = 0
+  for (const [name, count] of counts) {
+    if (count > bestCount) {
+      best = name
+      bestCount = count
+    }
+  }
+  return best || `Area near ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`
+}
+
+/**
+ * Group located reports into ~300 m grid cells and score each by severity
+ * weight. Returns cells sorted by score (highest first); the first is the
+ * hotspot. Computed entirely on the client from reports already fetched.
+ */
+export function buildAreaGrid(reports, sizeMeters = AREA_SIZE_METERS) {
+  const step = sizeMeters / METERS_PER_DEG_LAT
+  const cells = new Map()
+
+  for (const report of reports.filter(hasCoords)) {
+    const latIndex = Math.round(report.latitude / step)
+    const lngIndex = Math.round(report.longitude / step)
+    const key = `${latIndex}:${lngIndex}`
+    const center = { lat: latIndex * step, lng: lngIndex * step }
+    const cell = cells.get(key) ?? { key, center, reports: [], score: 0 }
+    cell.reports.push(report)
+    cell.score += severityWeight(report.severity)
+    cells.set(key, cell)
+  }
+
+  return [...cells.values()]
+    .map((cell) => ({
+      ...cell,
+      count: cell.reports.length,
+      label: areaLabel(cell.reports, cell.center),
+      radius: AREA_RADIUS_METERS,
+    }))
+    .sort((a, b) => b.score - a.score)
+}
+
+/**
+ * Reports of the same category clustered within ~500 m of each other. Used for
+ * the "3 similar reports near X" signal alert. Overlapping groups collapse into
+ * one cluster, and clusters are returned strongest first.
+ */
+export function findSignalClusters(
+  reports,
+  { minReports = SIGNAL_MIN_REPORTS, radius = SIGNAL_RADIUS_METERS } = {}
+) {
+  const located = reports.filter(hasCoords)
+  const byCategory = new Map()
+  for (const report of located) {
+    const list = byCategory.get(report.category) ?? []
+    list.push(report)
+    byCategory.set(report.category, list)
+  }
+
+  const used = new Set()
+  const clusters = []
+
+  for (const [category, list] of byCategory) {
+    for (const anchor of list) {
+      if (used.has(anchor.id)) continue
+      const near = list.filter(
+        (report) =>
+          metersBetween(
+            { lat: anchor.latitude, lng: anchor.longitude },
+            { lat: report.latitude, lng: report.longitude }
+          ) <= radius
+      )
+      if (near.length < minReports) continue
+
+      near.forEach((report) => used.add(report.id))
+      const center = {
+        lat: near.reduce((sum, r) => sum + r.latitude, 0) / near.length,
+        lng: near.reduce((sum, r) => sum + r.longitude, 0) / near.length,
+      }
+      clusters.push({
+        key: `${category}-${anchor.id}`,
+        category,
+        count: near.length,
+        center,
+        reports: near,
+        label: areaLabel(near, center),
+      })
+    }
+  }
+
+  return clusters.sort((a, b) => b.count - a.count)
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +348,85 @@ export async function fetchReport(supabase, id) {
   return { row: data, history: history ?? [] }
 }
 
+/** Reports the given user created, newest first, for the profile page. */
+export async function fetchMyReports(supabase, userId) {
+  const { data, error } = await supabase
+    .from('reports')
+    .select(REPORT_SELECT)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+/** How many verifications the user has given to other people's reports. */
+export async function fetchVerificationsGiven(supabase, userId) {
+  const { count, error } = await supabase
+    .from('report_verifications')
+    .select('report_id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+  if (error) throw error
+  return count ?? 0
+}
+
+/** Public profile row, or null when the user has not created one yet. */
+export async function fetchProfile(supabase, userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_SELECT)
+    .eq('id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return data ?? null
+}
+
+/** Profiles for a set of user ids, keyed by id (used for "Verified by"). */
+export async function fetchProfilesByIds(supabase, ids) {
+  if (!ids || ids.length === 0) return new Map()
+  const { data, error } = await supabase.from('profiles').select(PROFILE_SELECT).in('id', ids)
+  if (error) throw error
+  return new Map((data ?? []).map((row) => [row.id, row]))
+}
+
+/** Who verified a report, newest first. */
+export async function fetchVerifiers(supabase, reportId, limit = 8) {
+  const { data, error } = await supabase
+    .from('report_verifications')
+    .select('user_id, created_at')
+    .eq('report_id', reportId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  const ids = (data ?? []).map((row) => row.user_id)
+  const profiles = await fetchProfilesByIds(supabase, ids)
+  return ids.map((id) => profiles.get(id) ?? { id, full_name: 'A neighbour', avatar_url: null })
+}
+
+/** Same-category reports within ~500 m of the given report (max `limit`). */
+export async function fetchSimilarReports(supabase, report, limit = 3) {
+  if (!hasCoords(report)) return []
+  const { data, error } = await supabase
+    .from('reports')
+    .select(REPORT_SELECT)
+    .eq('category', report.category)
+    .neq('id', report.id)
+    .limit(50)
+  if (error) throw error
+
+  return (data ?? [])
+    .filter(hasCoords)
+    .map((row) => ({
+      row,
+      distance: metersBetween(
+        { lat: report.latitude, lng: report.longitude },
+        { lat: row.latitude, lng: row.longitude }
+      ),
+    }))
+    .filter((entry) => entry.distance <= SIGNAL_RADIUS_METERS)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, limit)
+}
+
 // ---------------------------------------------------------------------------
 // Writes
 // ---------------------------------------------------------------------------
@@ -260,13 +473,24 @@ export async function setVerification(supabase, reportId, userId, verified) {
   }
 }
 
+/** Insert or update the owner's profile row. */
+export async function upsertProfile(supabase, userId, values) {
+  const { error } = await supabase.from('profiles').upsert({ id: userId, ...values })
+  if (error) throw error
+}
+
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024
+
+function fileExtension(file, fallback) {
+  return (file.name.split('.').pop() || fallback).toLowerCase().replace(/[^a-z0-9]/g, '')
+}
 
 export async function uploadReportImage(supabase, file, reportId) {
   if (file.size > MAX_IMAGE_BYTES) {
     throw new Error('Images must be 5 MB or smaller.')
   }
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const ext = fileExtension(file, 'jpg')
   const path = `${reportId}/${Date.now()}.${ext || 'jpg'}`
 
   const { error } = await supabase.storage
@@ -275,6 +499,26 @@ export async function uploadReportImage(supabase, file, reportId) {
   if (error) throw error
 
   const { data } = supabase.storage.from('report-images').getPublicUrl(path)
+  return data.publicUrl
+}
+
+/** Upload an avatar into the public "avatars" bucket and return its URL. */
+export async function uploadAvatar(supabase, file, userId) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Please choose an image file.')
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    throw new Error('Profile photos must be 2 MB or smaller.')
+  }
+  const ext = fileExtension(file, 'jpg')
+  const path = `${userId}/${Date.now()}.${ext || 'jpg'}`
+
+  const { error } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { cacheControl: '3600', upsert: true })
+  if (error) throw error
+
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path)
   return data.publicUrl
 }
 
@@ -320,6 +564,14 @@ export function timeAgo(value) {
 
 export function shortId(id) {
   return id ? id.slice(0, 8).toUpperCase() : '—'
+}
+
+/** Initials for an avatar fallback. */
+export function initialsOf(name, fallback = '?') {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return fallback
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
 
 // Friendly wording for Supabase/PostgREST failures instead of raw error text.

@@ -3,7 +3,7 @@ import { AlertCircle } from 'lucide-react'
 export const inputClass =
   'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-ink transition-colors placeholder:text-ink/40 focus:outline-none focus:ring-2'
 export const inputIdle = 'border-ink/15 focus:border-accent focus:ring-accent/30'
-export const inputInvalid = 'border-red-400 focus:border-red-500 focus:ring-red-200'
+export const inputInvalid = 'border-accent focus:border-accent focus:ring-accent/30'
 
 export function inputStateClass(hasError) {
   return hasError ? inputInvalid : inputIdle
@@ -22,7 +22,7 @@ export function Field({ id, label, required = false, optional = false, error, hi
       <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-ink">
         {label}
         {required ? (
-          <span className="ml-1 text-accent-strong" aria-hidden="true">
+          <span className="ml-1 text-accent" aria-hidden="true">
             *
           </span>
         ) : null}
@@ -30,8 +30,8 @@ export function Field({ id, label, required = false, optional = false, error, hi
       </label>
       {children}
       {error ? (
-        <p id={`${id}-error`} className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+        <p id={`${id}-error`} className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-ink">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
           {error}
         </p>
       ) : hint ? (

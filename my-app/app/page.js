@@ -36,7 +36,7 @@ export default function LandingPage() {
       <AppHeader />
 
       <main id="main" className="flex-1">
-        <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:py-20 lg:px-8">
+        <section className="mx-auto grid max-w-[1200px] items-center gap-12 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:py-20 lg:px-8">
           <div>
             <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-ink sm:text-5xl">
               Report a local problem. Follow it until it&apos;s fixed.
@@ -50,7 +50,7 @@ export default function LandingPage() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href="/reports/new"
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
+                className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
               >
                 <Plus className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
                 Report an issue
@@ -70,7 +70,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-2xl bg-white p-6 ring-1 ring-ink/10 sm:p-10">
+          <div className="card overflow-hidden p-6 sm:p-10">
             <Image
               src={FrameImage}
               alt="Two neighbours reporting a local problem together"
@@ -81,7 +81,7 @@ export default function LandingPage() {
         </section>
 
         <section className="border-y border-ink/10 bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8 lg:py-16">
+          <div className="mx-auto max-w-[1200px] px-4 py-14 sm:px-6 lg:px-8 lg:py-16">
             <h2 className="text-2xl font-bold tracking-tight text-ink">How it works</h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink/65">
               Three steps from spotting a problem to seeing it resolved.
@@ -106,7 +106,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+        <section className="mx-auto max-w-[1200px] px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
           <div className="rounded-2xl bg-ink px-6 py-12 text-center sm:px-12">
             <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
               See what has been reported near you
@@ -118,7 +118,7 @@ export default function LandingPage() {
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Link
                 href="/reports"
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
+                className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
               >
                 Browse reports
               </Link>

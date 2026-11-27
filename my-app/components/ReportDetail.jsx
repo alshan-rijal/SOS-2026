@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useParams, useSearchParams } from 'next/navigation'
@@ -13,20 +13,21 @@ import {
   ExternalLink,
   FileQuestion,
   History,
-  ImageOff,
   LoaderCircle,
   MapPin,
   Pencil,
   RefreshCw,
   ThumbsUp,
-  User,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   STATUS_CONFIG,
   STATUS_ORDER,
   fetchMyVerifiedIds,
+  fetchProfile,
   fetchReport,
+  fetchSimilarReports,
+  fetchVerifiers,
   formatDateTime,
   hasCoords,
   normalizeReport,
@@ -38,12 +39,13 @@ import {
 } from '@/lib/reports'
 import { SeverityBadge, StatusBadge } from '@/components/Badges'
 import ReportImage from '@/components/ReportImage'
+import Avatar from '@/components/Avatar'
 import EmptyState from '@/components/EmptyState'
 import Breadcrumbs from '@/components/Breadcrumbs'
 
 const ItahariMap = dynamic(() => import('@/components/ItahariMap'), {
   ssr: false,
-  loading: () => <div className="h-full w-full animate-pulse rounded-2xl bg-ink/5" />,
+  loading: () => <div className="h-full w-full animate-pulse rounded-xl bg-ink/8" />,
 })
 
 const STATUS_ICONS = {
@@ -54,10 +56,10 @@ const STATUS_ICONS = {
 
 function SectionCard({ title, icon: Icon, children, action }) {
   return (
-    <section className="rounded-2xl bg-white p-5 ring-1 ring-ink/10 sm:p-6">
+    <section className="card p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
-          {Icon ? <Icon className="h-4 w-4 text-ink/40" strokeWidth={2} aria-hidden="true" /> : null}
+        <h2 className="flex items-center gap-2 text-base font-bold text-ink">
+          {Icon ? <Icon className="h-4 w-4 text-ink/45" strokeWidth={2} aria-hidden="true" /> : null}
           {title}
         </h2>
         {action}
@@ -70,13 +72,16 @@ function SectionCard({ title, icon: Icon, children, action }) {
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="h-5 w-64 animate-pulse rounded bg-ink/10" />
-      <div className="h-9 w-2/3 animate-pulse rounded bg-ink/10" />
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="h-72 animate-pulse rounded-2xl bg-ink/5 lg:col-span-4" />
+      <div className="h-5 w-64 animate-pulse rounded bg-ink/8" />
+      <div className="card h-28 animate-pulse" />
+      <div className="grid items-start gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-8">
-          <div className="h-40 animate-pulse rounded-2xl bg-ink/5" />
-          <div className="h-64 animate-pulse rounded-2xl bg-ink/5" />
+          <div className="card h-40 animate-pulse" />
+          <div className="card h-64 animate-pulse" />
+        </div>
+        <div className="space-y-6 lg:col-span-4">
+          <div className="card h-56 animate-pulse" />
+          <div className="card h-64 animate-pulse" />
         </div>
       </div>
     </div>
@@ -91,6 +96,9 @@ export default function ReportDetail() {
 
   const [report, setReport] = useState(null)
   const [history, setHistory] = useState([])
+  const [reporter, setReporter] = useState(null)
+  const [verifiers, setVerifiers] = useState([])
+  const [similar, setSimilar] = useState([])
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -111,8 +119,29 @@ export default function ReportDetail() {
 
       setUser(current ?? null)
       setHistory(entries)
-      setReport(row ? normalizeReport(row, verifiedIds) : null)
-      if (row) setNextStatus(row.status)
+
+      if (!row) {
+        setReport(null)
+        setReporter(null)
+        setVerifiers([])
+        setSimilar([])
+        setError('')
+        return
+      }
+
+      const normalized = normalizeReport(row, verifiedIds)
+      setReport(normalized)
+      setNextStatus(row.status)
+
+      // Secondary context fills the shorter column so no card sits alone in space.
+      const [profile, people, nearby] = await Promise.all([
+        row.user_id ? fetchProfile(supabase, row.user_id).catch(() => null) : Promise.resolve(null),
+        fetchVerifiers(supabase, row.id).catch(() => []),
+        fetchSimilarReports(supabase, normalized, 3).catch(() => []),
+      ])
+      setReporter(profile)
+      setVerifiers(people)
+      setSimilar(nearby.map((entry) => normalizeReport(entry.row, verifiedIds)))
       setError('')
     } catch (err) {
       setError(reportErrorMessage(err))
@@ -138,6 +167,7 @@ export default function ReportDetail() {
       setError('Sign in to verify a report.')
       return
     }
+    if (report.userId && user.id === report.userId) return
 
     const verified = !report.verifiedByMe
     setIsVerifying(true)
@@ -149,6 +179,8 @@ export default function ReportDetail() {
 
     try {
       await setVerification(supabase, report.id, user.id, verified)
+      const people = await fetchVerifiers(supabase, report.id).catch(() => verifiers)
+      setVerifiers(people)
     } catch (err) {
       setReport((current) => ({
         ...current,
@@ -177,6 +209,12 @@ export default function ReportDetail() {
     }
   }
 
+  const isOwner = Boolean(user && report?.userId && user.id === report.userId)
+  const mapReports = useMemo(
+    () => (report && hasCoords(report) ? [report] : []),
+    [report]
+  )
+
   if (isLoading) return <DetailSkeleton />
 
   if (error && !report) {
@@ -189,15 +227,15 @@ export default function ReportDetail() {
             { label: 'Report' },
           ]}
         />
-        <div className="flex flex-col items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="flex flex-col items-start gap-3 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm font-medium text-ink">
           <span className="flex items-start gap-2.5">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
             {error}
           </span>
           <button
             type="button"
             onClick={retry}
-            className="inline-flex items-center gap-2 rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100"
+            className="inline-flex items-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-accent/10"
           >
             <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
             Try again
@@ -224,7 +262,7 @@ export default function ReportDetail() {
           action={
             <Link
               href="/reports"
-              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
+              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90"
             >
               Back to reports
             </Link>
@@ -234,11 +272,10 @@ export default function ReportDetail() {
     )
   }
 
-  const isOwner = Boolean(user && report.userId && user.id === report.userId)
-  const mapReports = hasCoords(report) ? [report] : []
   const externalMapUrl = hasCoords(report)
     ? `https://www.openstreetmap.org/?mlat=${report.latitude}&mlon=${report.longitude}#map=17/${report.latitude}/${report.longitude}`
     : null
+  const reporterName = reporter?.full_name || report.reporterName
 
   return (
     <div className="space-y-6">
@@ -251,78 +288,133 @@ export default function ReportDetail() {
       />
 
       {justCreated ? (
-        <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-          <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+        <div className="flex items-start gap-2.5 rounded-xl border border-ink/20 bg-ink/5 p-4 text-sm font-medium text-ink">
+          <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
           Report submitted successfully. It is now visible on the map.
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <Link
-            href="/reports"
-            className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-ink/55 transition-colors hover:text-ink"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
-            Back to reports
-          </Link>
-          <h1 className="text-2xl font-bold leading-snug tracking-tight text-ink">
-            {report.title}
-          </h1>
-          <p className="mt-1.5 text-xs text-ink/50">
-            Report ID {shortId(report.id)} · {report.category}
-          </p>
+      {/* Compact header card */}
+      <section className="card p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <Link
+              href="/reports"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink/60 transition-colors duration-150 hover:text-ink"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
+              Back to reports
+            </Link>
+            <h1 className="mt-1.5 break-words text-xl font-bold leading-snug tracking-tight text-ink sm:text-2xl">
+              {report.title}
+            </h1>
+            <p className="mt-1 text-xs text-ink/55">
+              Report ID {shortId(report.id)} · {report.category} · reported {timeAgo(report.createdAt)}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <SeverityBadge severity={report.severity} />
+            <StatusBadge status={report.status} />
+          </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <SeverityBadge severity={report.severity} />
-          <StatusBadge status={report.status} />
-        </div>
-      </div>
+      </section>
 
       {error ? (
-        <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+        <div className="flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm font-medium text-ink">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
           {error}
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* Side panel — first on mobile, right column on desktop. */}
-        <aside className="space-y-6 lg:order-2 lg:col-span-4">
+      <div className="grid items-start gap-6 lg:grid-cols-12">
+        {/* Main column */}
+        <div className="space-y-6 lg:col-span-8">
+          <SectionCard title="Description">
+            {report.description ? (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-ink/80">
+                {report.description}
+              </p>
+            ) : (
+              <p className="text-sm text-ink/60">No description was provided.</p>
+            )}
+            {!report.imageUrl ? (
+              <p className="mt-3 flex items-center gap-2 text-xs font-medium text-ink/55">
+                <span className="h-1.5 w-1.5 rounded-full bg-ink/30" aria-hidden="true" />
+                No photo attached
+              </p>
+            ) : null}
+          </SectionCard>
+
+          {report.imageUrl ? (
+            <SectionCard title="Photo">
+              <ReportImage src={report.imageUrl} alt={`Photo for: ${report.title}`} />
+            </SectionCard>
+          ) : null}
+
+          <SectionCard title="Progress timeline" icon={History}>
+            {history.length === 0 ? (
+              <p className="text-sm text-ink/60">No status changes recorded yet.</p>
+            ) : (
+              <ol className="relative space-y-5 border-l border-ink/10 pl-5">
+                {history.map((entry) => {
+                  const config = STATUS_CONFIG[entry.status] ?? STATUS_CONFIG.pending
+                  const Icon = STATUS_ICONS[entry.status] ?? Clock
+                  return (
+                    <li key={entry.id} className="relative">
+                      <span className={`absolute -left-[1.875rem] flex h-5 w-5 items-center justify-center rounded-full border ring-4 ring-white ${config.badge}`}>
+                        <Icon className="h-3 w-3" strokeWidth={2.4} aria-hidden="true" />
+                      </span>
+                      <p className="text-sm font-semibold text-ink">{config.label}</p>
+                      {entry.note ? <p className="mt-0.5 text-sm text-ink/70">{entry.note}</p> : null}
+                      <p className="mt-0.5 text-xs text-ink/50">{formatDateTime(entry.created_at)}</p>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
+          </SectionCard>
+        </div>
+
+        {/* Side column */}
+        <aside className="space-y-6 lg:col-span-4">
           <SectionCard title="Status & actions">
             <dl className="space-y-3 text-sm">
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink/55">Status</dt>
+                <dt className="text-ink/60">Status</dt>
                 <dd>
                   <StatusBadge status={report.status} />
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink/55">Severity</dt>
+                <dt className="text-ink/60">Severity</dt>
                 <dd>
                   <SeverityBadge severity={report.severity} />
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink/55">Category</dt>
-                <dd className="text-right font-medium text-ink">{report.category}</dd>
+                <dt className="text-ink/60">Category</dt>
+                <dd className="min-w-0 truncate text-right font-medium text-ink" title={report.category}>
+                  {report.category}
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="flex items-center gap-1.5 text-ink/55">
-                  <User className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
-                  Reported by
-                </dt>
-                <dd className="truncate font-medium text-ink">{report.reporterName}</dd>
+                <dt className="shrink-0 text-ink/60">Reported by</dt>
+                <dd className="flex min-w-0 items-center gap-2">
+                  <Avatar src={reporter?.avatar_url} name={reporterName} size={22} />
+                  <span className="min-w-0 truncate font-medium text-ink" title={reporterName}>
+                    {reporterName}
+                  </span>
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="flex items-center gap-1.5 text-ink/55">
+                <dt className="flex items-center gap-1.5 text-ink/60">
                   <Clock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
                   Reported
                 </dt>
                 <dd className="text-right font-medium text-ink">{formatDateTime(report.createdAt)}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="flex items-center gap-1.5 text-ink/55">
+                <dt className="flex items-center gap-1.5 text-ink/60">
                   <CalendarClock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
                   Last updated
                 </dt>
@@ -330,25 +422,31 @@ export default function ReportDetail() {
               </div>
             </dl>
 
-            <button
-              type="button"
-              onClick={handleVerify}
-              disabled={isVerifying}
-              aria-pressed={report.verifiedByMe}
-              className={`mt-5 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
-                report.verifiedByMe
-                  ? 'bg-ink text-white hover:bg-ink/90'
-                  : 'border border-ink/15 text-ink hover:bg-ink/5'
-              }`}
-            >
-              <ThumbsUp className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
-              {report.verifiedByMe
-                ? `Verified by you · ${report.verifications}`
-                : `Verify this report · ${report.verifications}`}
-            </button>
+            {isOwner ? (
+              <p className="mt-5 rounded-lg bg-surface px-3 py-2.5 text-center text-sm font-semibold text-ink">
+                You reported this
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleVerify}
+                disabled={isVerifying || report.verifiedByMe}
+                aria-pressed={report.verifiedByMe}
+                className={`mt-5 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed ${
+                  report.verifiedByMe
+                    ? 'bg-surface text-ink'
+                    : 'bg-ink text-white hover:bg-ink/90'
+                }`}
+              >
+                <ThumbsUp className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
+                {report.verifiedByMe
+                  ? `Verified · ${report.verifications}`
+                  : `Verify this report · ${report.verifications}`}
+              </button>
+            )}
             {!user ? (
-              <p className="mt-2 text-center text-xs text-ink/50">
-                <Link href="/login" className="font-semibold text-accent-strong hover:underline">
+              <p className="mt-2 text-center text-xs text-ink/60">
+                <Link href="/login" className="font-semibold text-ink hover:underline">
                   Sign in
                 </Link>{' '}
                 to verify.
@@ -357,7 +455,7 @@ export default function ReportDetail() {
 
             {isOwner ? (
               <form onSubmit={handleStatusUpdate} className="mt-5 border-t border-ink/10 pt-5">
-                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink/50">
+                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink/60">
                   <Pencil className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
                   Update status
                 </h3>
@@ -391,7 +489,7 @@ export default function ReportDetail() {
                   <button
                     type="submit"
                     disabled={isUpdatingStatus || nextStatus === report.status}
-                    className="w-full rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isUpdatingStatus ? 'Updating…' : 'Save status'}
                   </button>
@@ -409,7 +507,7 @@ export default function ReportDetail() {
                   href={externalMapUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent-strong transition-colors hover:underline"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink transition-colors duration-150 hover:underline"
                 >
                   Open in map
                   <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
@@ -417,75 +515,92 @@ export default function ReportDetail() {
               ) : null
             }
           >
-            <p className="text-sm font-medium text-ink">
-              {report.locationName || 'No address given'}
-            </p>
-            <p className="mt-1 text-xs text-ink/50">
-              {hasCoords(report)
-                ? `${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}`
-                : 'No coordinates recorded'}
-            </p>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <p className="min-w-0 truncate text-sm font-medium text-ink" title={report.locationName || 'No address given'}>
+                {report.locationName || 'No address given'}
+              </p>
+              {hasCoords(report) ? (
+                <p className="text-xs tabular-nums text-ink/55">
+                  {report.latitude.toFixed(5)}, {report.longitude.toFixed(5)}
+                </p>
+              ) : null}
+            </div>
 
             {hasCoords(report) ? (
-              <div className="mt-3 h-52">
-                <ItahariMap reports={mapReports} zoom={15} showPopups={false} />
+              <div className="mt-3 overflow-hidden rounded-xl">
+                <ItahariMap
+                  reports={mapReports}
+                  zoom={15}
+                  height="16rem"
+                  showPopups={false}
+                  showAreas={false}
+                  className="w-full"
+                />
               </div>
             ) : (
-              <p className="mt-3 rounded-lg border border-dashed border-ink/20 bg-ink/2 px-3 py-4 text-center text-xs text-ink/50">
+              <p className="mt-3 rounded-lg border border-dashed border-ink/20 bg-ink/5 px-3 py-3 text-center text-xs text-ink/55">
                 This report has no map location.
               </p>
             )}
           </SectionCard>
-        </aside>
 
-        {/* Main column. */}
-        <div className="space-y-6 lg:order-1 lg:col-span-8">
-          <SectionCard title="Description">
-            {report.description ? (
-              <p className="whitespace-pre-line text-sm leading-relaxed text-ink/75">
-                {report.description}
+          <SectionCard title="Verified by">
+            {verifiers.length === 0 ? (
+              <p className="text-sm text-ink/60">
+                No verifications yet. Be the first to confirm this problem.
               </p>
             ) : (
-              <p className="text-sm text-ink/50">No description was provided.</p>
-            )}
-          </SectionCard>
-
-          <SectionCard title="Photo">
-            {report.imageUrl ? (
-              <ReportImage src={report.imageUrl} alt={`Photo for: ${report.title}`} />
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/20 py-10 text-center">
-                <ImageOff className="h-6 w-6 text-ink/35" strokeWidth={1.8} aria-hidden="true" />
-                <p className="text-sm text-ink/55">No photo was attached to this report.</p>
+              <div className="flex items-center gap-3">
+                <div className="flex -space-x-2">
+                  {verifiers.slice(0, 6).map((person) => (
+                    <Avatar
+                      key={person.id}
+                      src={person.avatar_url}
+                      name={person.full_name}
+                      size={30}
+                      className="ring-2 ring-white"
+                    />
+                  ))}
+                </div>
+                <p className="text-sm text-ink/70">
+                  <span className="font-semibold text-ink">{report.verifications}</span>{' '}
+                  {report.verifications === 1 ? 'person verified' : 'people verified'} this report.
+                </p>
               </div>
             )}
           </SectionCard>
 
-          <SectionCard title="Progress timeline" icon={History}>
-            {history.length === 0 ? (
-              <p className="text-sm text-ink/55">No status changes recorded yet.</p>
+          <SectionCard title="Similar reports nearby">
+            {similar.length === 0 ? (
+              <p className="text-sm text-ink/60">
+                No other {report.category} reports within 500 m.
+              </p>
             ) : (
-              <ol className="relative space-y-5 border-l border-ink/10 pl-5">
-                {history.map((entry) => {
-                  const config = STATUS_CONFIG[entry.status] ?? STATUS_CONFIG.pending
-                  const Icon = STATUS_ICONS[entry.status] ?? Clock
-                  return (
-                    <li key={entry.id} className="relative">
-                      <span className={`absolute -left-[1.875rem] flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-white ${config.badge}`}>
-                        <Icon className="h-3 w-3" strokeWidth={2.4} aria-hidden="true" />
+              <ul className="space-y-3">
+                {similar.map((item) => (
+                  <li key={item.id}>
+                    <Link
+                      href={`/reports/${item.id}`}
+                      className="block rounded-lg border border-ink/12 p-3 transition-colors duration-150 hover:bg-ink/5"
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <SeverityBadge severity={item.severity} />
+                        <StatusBadge status={item.status} />
                       </span>
-                      <p className="text-sm font-semibold text-ink">{config.label}</p>
-                      {entry.note ? (
-                        <p className="mt-0.5 text-sm text-ink/65">{entry.note}</p>
-                      ) : null}
-                      <p className="mt-0.5 text-xs text-ink/45">{formatDateTime(entry.created_at)}</p>
-                    </li>
-                  )
-                })}
-              </ol>
+                      <span className="mt-2 block truncate text-sm font-semibold text-ink" title={item.title}>
+                        {item.title}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-ink/60">
+                        {timeAgo(item.createdAt)}
+                        {item.locationName ? ` · ${item.locationName}` : ''}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
           </SectionCard>
-        </div>
+        </aside>
       </div>
     </div>
   )

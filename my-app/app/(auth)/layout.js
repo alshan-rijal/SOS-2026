@@ -10,7 +10,7 @@ const POINTS = [
 export default function AuthLayout({ children }) {
   return (
     <div className="min-h-screen bg-surface p-4 sm:p-6 lg:flex lg:items-center lg:justify-center lg:p-8">
-      <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-ink/10 lg:flex">
+      <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-ink/12 bg-white shadow-sm lg:flex">
         <aside className="hidden shrink-0 bg-surface/70 p-10 lg:flex lg:w-2/5 lg:flex-col">
           <Logo />
           <h2 className="mt-10 text-2xl font-bold leading-snug text-ink">

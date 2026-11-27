@@ -78,15 +78,15 @@ export default function RegisterForm() {
       </p>
 
       {serverError ? (
-        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-3.5 text-sm text-ink">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
           {serverError}
         </div>
       ) : null}
 
       {successMessage ? (
-        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-800">
-          <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+        <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-ink/20 bg-ink/5 p-3.5 text-sm text-ink">
+          <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
           {successMessage}
         </div>
       ) : null}
@@ -138,7 +138,7 @@ export default function RegisterForm() {
               aria-describedby={errors.password ? 'password-error' : 'password-hint'}
               className={`w-full rounded-lg border bg-white px-3.5 py-2.5 pr-11 text-sm text-ink transition-colors placeholder:text-ink/40 focus:outline-none focus:ring-2 ${
                 errors.password
-                  ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+                  ? 'border-accent focus:border-accent focus:ring-accent/30'
                   : 'border-ink/15 focus:border-accent focus:ring-accent/30'
               }`}
             />
@@ -156,7 +156,7 @@ export default function RegisterForm() {
             </button>
           </div>
           {errors.password ? (
-            <p id="password-error" className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600">
+            <p id="password-error" className="mt-1.5 flex items-center gap-1.5 text-xs text-ink">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
               {errors.password}
             </p>
@@ -170,7 +170,7 @@ export default function RegisterForm() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? 'Creating account…' : 'Create account'}
         </button>
@@ -180,7 +180,7 @@ export default function RegisterForm() {
 
       <p className="mt-6 text-center text-sm text-ink/60">
         Already have an account?{' '}
-        <Link href="/login" className="font-semibold text-accent-strong hover:underline">
+        <Link href="/login" className="font-semibold text-ink hover:underline">
           Sign in
         </Link>
       </p>

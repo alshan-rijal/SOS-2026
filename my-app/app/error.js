@@ -8,7 +8,7 @@ export default function GlobalError({ error, reset }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4 py-16 text-center">
       <Logo />
-      <span className="mt-10 flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
+      <span className="mt-10 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-accent">
         <AlertCircle className="h-6 w-6" strokeWidth={1.8} aria-hidden="true" />
       </span>
       <h1 className="mt-5 text-2xl font-bold tracking-tight text-ink">Something went wrong</h1>
@@ -24,7 +24,7 @@ export default function GlobalError({ error, reset }) {
         <button
           type="button"
           onClick={reset}
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-strong"
+          className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
         >
           <RefreshCw className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
           Try again
