@@ -175,7 +175,7 @@ create policy "Report images are publicly readable"
 
 create policy "Signed-in users can upload report images"
   on storage.objects for insert
-  to authenticated
+  to authenticated 
   with check (bucket_id = 'report-images');
 
 create policy "Uploaders can replace their own report images"
