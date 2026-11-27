@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { INITIAL_REPORTS, SEVERITY_CONFIG, ITAHARI_CENTER } from '../../lib/reports'
 
 const ItahariMap = dynamic(() => import('../../components/ItahariMap'), {
@@ -11,6 +13,12 @@ const ItahariMap = dynamic(() => import('../../components/ItahariMap'), {
 })
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const supabase = createClient()
+
+  const [userName, setUserName] = useState('')
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
   const [reports, setReports] = useState(INITIAL_REPORTS)
   const [severityFilter, setSeverityFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('All')
@@ -24,6 +32,33 @@ export default function DashboardPage() {
   const [newLocation, setNewLocation] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [newCoords, setNewCoords] = useState(ITAHARI_CENTER)
+
+  // Load current user's name for the header and new reports
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single()
+
+        setUserName(profile?.full_name || user.email || 'Neighbor')
+      }
+    }
+    loadUser()
+  }, [supabase])
+
+  async function handleLogout() {
+    setIsLoggingOut(true)
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   // Detect active signals (3 or more reports in the same category)
   const categoryCounts = reports.reduce((acc, r) => {
@@ -67,7 +102,7 @@ export default function DashboardPage() {
       location: newLocation.trim(),
       coords: newCoords,
       time: 'Just now',
-      author: 'You',
+      author: userName || 'You',
       verifications: 1,
       verifiedByMe: true,
       description: newDescription.trim() || 'Community reported issue.',
@@ -130,23 +165,27 @@ export default function DashboardPage() {
             >
               Full Map
             </Link>
-            <Link
-              href="/login"
-              className="text-[#0b4a6f]/70 hover:text-[#0b4a6f] transition-colors"
-            >
-              Log In
-            </Link>
-            <Link
-              href="/register"
-              className="text-[#0b4a6f]/70 hover:text-[#0b4a6f] transition-colors"
-            >
-              Sign Up
-            </Link>
+
+            {userName && (
+              <span className="hidden sm:inline-block text-xs font-semibold text-[#0b4a6f]/70 bg-white/80 px-3 py-1 rounded-full ring-1 ring-[#0b4a6f]/10">
+                {userName}
+              </span>
+            )}
+
             <button
               onClick={() => setShowReportModal(true)}
               className="inline-flex items-center justify-center rounded-full bg-[#ff6b5a] px-5 py-2 text-white font-semibold shadow-md shadow-[#ff6b5a]/30 hover:bg-[#ff5a47] transition-all cursor-pointer"
             >
               + Report Issue
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0b4a6f] ring-1 ring-[#0b4a6f]/15 hover:bg-[#0b4a6f] hover:text-white disabled:opacity-60 transition-all cursor-pointer"
+            >
+              {isLoggingOut ? 'Signing out...' : 'Log Out'}
             </button>
           </nav>
         </div>
