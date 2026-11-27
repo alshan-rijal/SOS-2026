@@ -6,11 +6,11 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { INITIAL_REPORTS, SEVERITY_CONFIG, ITAHARI_CENTER } from '../../lib/reports'
-
-const ItahariMap = dynamic(() => import('../../components/ItahariMap'), {
+// Dynamically import the map component and disable SSR
+const ItahariMap = dynamic(() => import('@/components/ItahariMap'), {
   ssr: false,
-  loading: () => <div className="h-full w-full animate-pulse rounded-2xl bg-[#eaf4fb]" />,
-})
+  loading: () => <p>Loading map...</p>, // Optional: show something while loading
+});
 
 export default function DashboardPage() {
   const router = useRouter()
