@@ -1,8 +1,110 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export default function Register() {
+  const router = useRouter()
+  const supabase = createClient()
+
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+  })
+
+  const [errors, setErrors] = useState({})
+  const [serverError, setServerError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+
+  // Validation logic
+  const validate = () => {
+    const newErrors = {}
+
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = 'Full name is required.'
+    } else if (formData.fullName.trim().length < 2) {
+      newErrors.fullName = 'Name must be at least 2 characters.'
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email address is required.'
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address.'
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required.'
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters long.'
+    } else if (!/(?=.*[0-9])(?=.*[!@#$%^&*])/.test(formData.password)) {
+      newErrors.password = 'Include at least one number and one special character (!@#$%^&*).'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    // Clear field-specific error as user types
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setServerError('')
+    setSuccessMessage('')
+
+    if (!validate()) return
+
+    setIsLoading(true)
+
+    const { data, error } = await supabase.auth.signUp({
+      email: formData.email.trim(),
+      password: formData.password,
+      options: {
+        data: {
+          full_name: formData.fullName.trim(),
+        },
+      },
+    })
+
+    setIsLoading(false)
+
+    if (error) {
+      setServerError(error.message)
+      return
+    }
+
+    // If email confirmation is enabled in Supabase, session will be null
+    if (data?.user && !data?.session) {
+      setSuccessMessage('Registration successful! Please check your email to verify your account.')
+    } else {
+      router.push('/dashboard')
+      router.refresh()
+    }
+  }
+
+  const handleOAuth = async (provider) => {
+    setServerError('')
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    if (error) setServerError(error.message)
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#eaf4fb] px-4 py-12 md:px-10">
       {/* Main Landscape Card */}
@@ -10,7 +112,6 @@ export default function Register() {
         
         {/* Left Side - Branding */}
         <div className="hidden lg:flex lg:w-5/12 bg-[#eaf4fb] p-12 flex-col relative overflow-hidden">
-          {/* Subtle background decorative blobs */}
           <div className="absolute -top-20 -left-20 w-64 h-64 bg-[#0b4a6f]/5 rounded-full blur-3xl" />
           <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-[#ff6b5a]/10 rounded-full blur-3xl" />
           
@@ -32,7 +133,6 @@ export default function Register() {
               Create an account to connect with trained listeners, access resources, and join a supportive community.
             </p>
 
-            {/* Feature List */}
             <ul className="space-y-4 mt-auto mb-8">
               <li className="flex items-start gap-3 text-sm text-[#0b4a6f]/80">
                 <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-[#ff6b5a] shrink-0" />
@@ -59,44 +159,84 @@ export default function Register() {
             <span className="text-lg font-bold text-[#0b4a6f]">Lifeline</span>
           </div>
 
-          <div className="mb-8">
+          <div className="mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-[#0b4a6f] mb-2">Create an account</h1>
             <p className="text-[#0b4a6f]/60 text-sm">Fill in your details to get started.</p>
           </div>
 
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          {/* Server Error or Verification Alert */}
+          {serverError && (
+            <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {serverError}
+            </div>
+          )}
+          {successMessage && (
+            <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
+              {successMessage}
+            </div>
+          )}
+
+          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
             <div>
               <label className="block text-sm font-semibold text-[#0b4a6f] mb-1.5">Full Name</label>
               <input 
                 type="text" 
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
                 placeholder="John Doe"
-                className="w-full rounded-xl border border-[#0b4a6f]/20 bg-transparent px-4 py-3 text-sm text-[#0b4a6f] placeholder:text-[#0b4a6f]/40 focus:outline-none focus:ring-2 focus:ring-[#ff6b5a] focus:border-transparent transition-all"
+                className={`w-full rounded-xl border ${
+                  errors.fullName ? 'border-red-500 focus:ring-red-500' : 'border-[#0b4a6f]/20 focus:ring-[#ff6b5a]'
+                } bg-transparent px-4 py-3 text-sm text-[#0b4a6f] placeholder:text-[#0b4a6f]/40 focus:outline-none focus:ring-2 focus:border-transparent transition-all`}
               />
+              {errors.fullName && <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-[#0b4a6f] mb-1.5">Email address</label>
               <input 
                 type="email" 
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
                 placeholder="you@lifeline.com"
-                className="w-full rounded-xl border border-[#0b4a6f]/20 bg-transparent px-4 py-3 text-sm text-[#0b4a6f] placeholder:text-[#0b4a6f]/40 focus:outline-none focus:ring-2 focus:ring-[#ff6b5a] focus:border-transparent transition-all"
+                className={`w-full rounded-xl border ${
+                  errors.email ? 'border-red-500 focus:ring-red-500' : 'border-[#0b4a6f]/20 focus:ring-[#ff6b5a]'
+                } bg-transparent px-4 py-3 text-sm text-[#0b4a6f] placeholder:text-[#0b4a6f]/40 focus:outline-none focus:ring-2 focus:border-transparent transition-all`}
               />
+              {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-[#0b4a6f] mb-1.5">Password</label>
-              <input 
-                type="password" 
-                placeholder="••••••••"
-                className="w-full rounded-xl border border-[#0b4a6f]/20 bg-transparent px-4 py-3 text-sm text-[#0b4a6f] placeholder:text-[#0b4a6f]/40 focus:outline-none focus:ring-2 focus:ring-[#ff6b5a] focus:border-transparent transition-all"
-              />
+              <div className="relative">
+                <input 
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  className={`w-full rounded-xl border ${
+                    errors.password ? 'border-red-500 focus:ring-red-500' : 'border-[#0b4a6f]/20 focus:ring-[#ff6b5a]'
+                  } bg-transparent px-4 py-3 pr-16 text-sm text-[#0b4a6f] placeholder:text-[#0b4a6f]/40 focus:outline-none focus:ring-2 focus:border-transparent transition-all`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#0b4a6f]/60 hover:text-[#0b4a6f]"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
             </div>
 
             <button 
               type="submit"
-              className="w-full rounded-xl bg-[#ff6b5a] px-4 py-3.5 text-white font-semibold shadow-md shadow-[#ff6b5a]/30 hover:bg-[#ff5a47] hover:shadow-[#ff6b5a]/40 transition-all duration-200 mt-4"
+              disabled={isLoading}
+              className="w-full rounded-xl bg-[#ff6b5a] px-4 py-3.5 text-white font-semibold shadow-md shadow-[#ff6b5a]/30 hover:bg-[#ff5a47] hover:shadow-[#ff6b5a]/40 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 mt-4"
             >
-              Create Account
+              {isLoading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 
@@ -107,7 +247,11 @@ export default function Register() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 rounded-xl border border-[#0b4a6f]/20 px-4 py-2.5 text-sm font-medium text-[#0b4a6f] hover:bg-[#eaf4fb] transition-colors">
+            <button 
+              type="button"
+              onClick={() => handleOAuth('google')}
+              className="flex items-center justify-center gap-2 rounded-xl border border-[#0b4a6f]/20 px-4 py-2.5 text-sm font-medium text-[#0b4a6f] hover:bg-[#eaf4fb] transition-colors"
+            >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -116,7 +260,11 @@ export default function Register() {
               </svg>
               Google
             </button>
-            <button className="flex items-center justify-center gap-2 rounded-xl border border-[#0b4a6f]/20 px-4 py-2.5 text-sm font-medium text-[#0b4a6f] hover:bg-[#eaf4fb] transition-colors">
+            <button 
+              type="button"
+              onClick={() => handleOAuth('github')}
+              className="flex items-center justify-center gap-2 rounded-xl border border-[#0b4a6f]/20 px-4 py-2.5 text-sm font-medium text-[#0b4a6f] hover:bg-[#eaf4fb] transition-colors"
+            >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
               </svg>
