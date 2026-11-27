@@ -100,34 +100,46 @@ export default function AppHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
-  useEffect(() => {
+useEffect(() => {
     let active = true
 
-    async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    async function loadUser(sessionUser) {
+      const currentUser =
+        sessionUser ??
+        (await supabase.auth.getUser()).data?.user ??
+        null
+
       if (!active) return
-      if (!user) {
+      if (!currentUser) {
         setUserName('')
         setUserAvatar('')
         return
       }
+
       const { data: profile } = await supabase
         .from('profiles')
-        .select('full_name, avatar_url')
-        .eq('id', user.id)
+        .select('*')
+        .eq('id', currentUser.id)
         .maybeSingle()
+
       if (!active) return
-      setUserName(profile?.full_name || user.email || 'Signed in')
-      setUserAvatar(profile?.avatar_url || user.user_metadata?.avatar_url || '')
+
+      const meta = currentUser.user_metadata || {}
+      setUserName(
+        profile?.full_name || meta.full_name || meta.name || currentUser.email || 'Member'
+      )
+      setUserAvatar(
+        profile?.avatar_url || meta.avatar_url || meta.picture || ''
+      )
     }
 
     loadUser()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => loadUser())
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadUser(session?.user ?? null)
+    })
 
     return () => {
       active = false
@@ -135,6 +147,28 @@ export default function AppHeader() {
     }
   }, [supabase])
 
+  function closeMenu() {
+    setIsMenuOpen(false)
+  }
+
+  async function handleLogout() {
+    setIsLoggingOut(true)
+    await supabase.auth.signOut()
+    setIsLoggingOut(false)
+    router.push('/login')
+    router.refresh()
+  }
+  function closeMenu() {
+    setIsMenuOpen(false)
+  }
+
+  async function handleLogout() {
+    setIsLoggingOut(true)
+    await supabase.auth.signOut()
+    setIsLoggingOut(false)
+    router.push('/login')
+    router.refresh()
+  }
   function closeMenu() {
     setIsMenuOpen(false)
   }
