@@ -8,7 +8,7 @@
 -- profiles.role
 -- ---------------------------------------------------------------------------
 alter table public.profiles
-  add column if not exists role text not null default 'user';
+  add column if not exists role text not null default 'citizen';
 
 -- The check has to be added separately: `add column if not exists` cannot carry
 -- a named constraint that we can then re-run safely.
@@ -21,7 +21,7 @@ begin
       and conrelid = 'public.profiles'::regclass
   ) then
     alter table public.profiles
-      add constraint profiles_role_check check (role in ('user', 'admin'));
+      add constraint profiles_role_check check (role in ('citizen', 'admin'));
   end if;
 end $$;
 
