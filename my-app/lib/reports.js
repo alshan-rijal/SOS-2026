@@ -1,6 +1,10 @@
 // Shared report vocabulary (categories, statuses, severity) and every Supabase
 // operation the app performs against the reports schema in supabase/schema.sql.
 
+// `./i18n.js` keeps the file runnable by Node (scripts/check-zones.mjs), which
+// does not resolve extensionless specifiers.
+import { localizeField, t } from './i18n.js'
+
 export const ITAHARI_CENTER = { lat: 26.6646, lng: 87.2718 }
 
 export const CATEGORIES = [
@@ -11,8 +15,51 @@ export const CATEGORIES = [
   'Drainage',
 ]
 
+// The `issue_type_ne` side of a problem zone: categories are a fixed vocabulary,
+// so their Nepali labels live here beside the list rather than in the database.
+export const CATEGORY_LABELS_NE = {
+  'Road & Potholes': 'सडक र खाल्डाखुल्डी',
+  'Water Supply': 'खानेपानी',
+  Electricity: 'बिजुली',
+  'Waste Management': 'फोहोर व्यवस्थापन',
+  Drainage: 'ढल निकास',
+}
+
+/** Category name in the reader's language, falling back to the stored value. */
+export function categoryLabel(category, lang = 'en') {
+  if (lang !== 'ne') return category
+  return CATEGORY_LABELS_NE[category] ?? category
+}
+
+export const SEVERITY_LABELS_NE = {
+  critical: 'अति गम्भीर',
+  high: 'उच्च',
+  medium: 'मध्यम',
+  low: 'न्यून',
+}
+
+/** Severity name in the reader's language. */
+export function severityLabel(severity, lang = 'en') {
+  const fallback = SEVERITY_CONFIG[severity]?.label ?? severity
+  if (lang !== 'ne') return fallback
+  return SEVERITY_LABELS_NE[severity] ?? fallback
+}
+
+export const STATUS_LABELS_NE = {
+  pending: 'बाँकी',
+  in_progress: 'प्रक्रियामा',
+  resolved: 'समाधान भयो',
+}
+
+/** Status name in the reader's language. */
+export function statusLabel(status, lang = 'en') {
+  const fallback = STATUS_CONFIG[status]?.label ?? status
+  if (lang !== 'ne') return fallback
+  return STATUS_LABELS_NE[status] ?? fallback
+}
+
 // Every badge uses only the four palette colours: ink #0b4a6f, accent #ff6b5a,
-// surface #eaf4fb and white. `weight` drives the hotspot score; `pin` sizes and
+// surface #eaf4fb and white. `weight` drives the zone score; `pin` sizes and
 // fills the teardrop markers on the map.
 export const SEVERITY_CONFIG = {
   critical: {
@@ -74,16 +121,26 @@ export const SORT_OPTIONS = [
 
 export const PAGE_SIZE = 9
 
-// Hotspot grouping and signal-alert distances.
-export const AREA_SIZE_METERS = 300
-export const AREA_RADIUS_METERS = 170
+// Problem-prone zones: two located reports share a zone when they are at most
+// ZONE_RADIUS_M apart. The radius is user-selectable (map toolbar) and kept in
+// the URL. Sidebar signal alerts reuse the same zones so the two never disagree.
+export const ZONE_RADIUS_M = 1000
+export const ZONE_MIN_REPORTS = 2
+// Capped at 1 km: a wider join radius merges unrelated streets into one blob.
+export const ZONE_RADIUS_OPTIONS = [500, 1000]
+
+// Zone circle colours. A zone holding any high/critical report is coral, every
+// other zone is navy; the map, its legend and its pill labels share these.
+export const ZONE_TIER_COLOR = { high: '#ff6b5a', moderate: '#0b4a6f' }
+
+// Same-category "reports near this one" distance on the report detail page.
 export const SIGNAL_RADIUS_METERS = 500
 export const SIGNAL_MIN_REPORTS = 3
 
-const REPORT_SELECT =
-  'id,user_id,title,description,category,severity,status,location_name,' +
-  'latitude,longitude,image_url,reporter_name,created_at,updated_at,' +
-  'report_verifications(count)'
+// `*` keeps every read working whether or not the optional bilingual columns
+// (added by supabase/migrations/20261128_006_bilingual_content.sql) exist yet;
+// the row mapper picks the fields it needs.
+const REPORT_SELECT = '*,report_verifications(count)'
 
 // `*` keeps profile reads working whether or not the optional columns
 // (phone, ward, bio, avatar_url) have been added by schema.sql yet.
@@ -103,6 +160,10 @@ export function normalizeReport(row, verifiedIds) {
     severity: row.severity,
     status: row.status,
     locationName: row.location_name ?? '',
+    // Both hold the SQL `_ne` suffix so localizeField() reads the same field name
+    // whatever the backend (see lib/i18n.js). Empty until the bilingual migration
+    // has been applied.
+    locationName_ne: row.location_name_ne ?? '',
     latitude: row.latitude,
     longitude: row.longitude,
     imageUrl: row.image_url || null,
@@ -129,7 +190,7 @@ export function severityWeight(severity) {
 }
 
 // ---------------------------------------------------------------------------
-// Client-side geography: distances, hotspot cells and signal clusters
+// Client-side geography: distances and problem-prone zones
 // ---------------------------------------------------------------------------
 
 const METERS_PER_DEG_LAT = 111320
@@ -142,11 +203,24 @@ export function metersBetween(a, b) {
   return Math.hypot(dLat, dLng)
 }
 
+const EARTH_RADIUS_M = 6371000
+
+/** Great-circle metres between two {lat,lng} points (haversine). */
+export function haversineMeters(a, b) {
+  const rad = (deg) => (deg * Math.PI) / 180
+  const dLat = rad(b.lat - a.lat)
+  const dLng = rad(b.lng - a.lng)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(Math.min(1, h)))
+}
+
 /** Most common non-empty location name in a set of reports, or a coordinate label. */
-function areaLabel(reports, center) {
+function areaLabel(reports, center, lang = 'en') {
   const counts = new Map()
   for (const report of reports) {
-    const name = (report.locationName || '').trim()
+    const name = localizeField(report, 'locationName', lang).trim()
     if (name) counts.set(name, (counts.get(name) ?? 0) + 1)
   }
   let best = ''
@@ -161,84 +235,105 @@ function areaLabel(reports, center) {
 }
 
 /**
- * Group located reports into ~300 m grid cells and score each by severity
- * weight. Returns cells sorted by score (highest first); the first is the
- * hotspot. Computed entirely on the client from reports already fetched.
+ * Group located reports into problem-prone zones: two reports share a zone when
+ * they are at most `radiusMeters` apart (haversine). Category and severity do
+ * not matter — mixed problems in the same place count together. Every group of
+ * at least `minReports` reports becomes a zone, strongest first. Computed
+ * entirely on the client from reports already fetched.
+ *
+ * `lang` only affects the zone's display name, which comes from the report that
+ * names the area (its Nepali twin when the reader is on Nepali).
  */
-export function buildAreaGrid(reports, sizeMeters = AREA_SIZE_METERS) {
-  const step = sizeMeters / METERS_PER_DEG_LAT
-  const cells = new Map()
-
-  for (const report of reports.filter(hasCoords)) {
-    const latIndex = Math.round(report.latitude / step)
-    const lngIndex = Math.round(report.longitude / step)
-    const key = `${latIndex}:${lngIndex}`
-    const center = { lat: latIndex * step, lng: lngIndex * step }
-    const cell = cells.get(key) ?? { key, center, reports: [], score: 0 }
-    cell.reports.push(report)
-    cell.score += severityWeight(report.severity)
-    cells.set(key, cell)
-  }
-
-  return [...cells.values()]
-    .map((cell) => ({
-      ...cell,
-      count: cell.reports.length,
-      label: areaLabel(cell.reports, cell.center),
-      radius: AREA_RADIUS_METERS,
-    }))
-    .sort((a, b) => b.score - a.score)
-}
-
-/**
- * Reports of the same category clustered within ~500 m of each other. Used for
- * the "3 similar reports near X" signal alert. Overlapping groups collapse into
- * one cluster, and clusters are returned strongest first.
- */
-export function findSignalClusters(
+export function findProblemZones(
   reports,
-  { minReports = SIGNAL_MIN_REPORTS, radius = SIGNAL_RADIUS_METERS } = {}
+  radiusMeters = ZONE_RADIUS_M,
+  minReports = ZONE_MIN_REPORTS,
+  lang = 'en'
 ) {
   const located = reports.filter(hasCoords)
-  const byCategory = new Map()
-  for (const report of located) {
-    const list = byCategory.get(report.category) ?? []
-    list.push(report)
-    byCategory.set(report.category, list)
+  const coords = located.map((report) => ({ lat: report.latitude, lng: report.longitude }))
+  const parent = located.map((_, index) => index)
+
+  const find = (index) => {
+    while (parent[index] !== index) {
+      parent[index] = parent[parent[index]]
+      index = parent[index]
+    }
+    return index
   }
 
-  const used = new Set()
-  const clusters = []
-
-  for (const [category, list] of byCategory) {
-    for (const anchor of list) {
-      if (used.has(anchor.id)) continue
-      const near = list.filter(
-        (report) =>
-          metersBetween(
-            { lat: anchor.latitude, lng: anchor.longitude },
-            { lat: report.latitude, lng: report.longitude }
-          ) <= radius
-      )
-      if (near.length < minReports) continue
-
-      near.forEach((report) => used.add(report.id))
-      const center = {
-        lat: near.reduce((sum, r) => sum + r.latitude, 0) / near.length,
-        lng: near.reduce((sum, r) => sum + r.longitude, 0) / near.length,
-      }
-      clusters.push({
-        key: `${category}-${anchor.id}`,
-        category,
-        count: near.length,
-        center,
-        reports: near,
-        label: areaLabel(near, center),
-      })
+  for (let i = 0; i < located.length; i += 1) {
+    for (let j = i + 1; j < located.length; j += 1) {
+      if (haversineMeters(coords[i], coords[j]) > radiusMeters) continue
+      const rootI = find(i)
+      const rootJ = find(j)
+      if (rootI !== rootJ) parent[rootJ] = rootI
     }
   }
 
-  return clusters.sort((a, b) => b.count - a.count)
+  const groups = new Map()
+  located.forEach((report, index) => {
+    const root = find(index)
+    if (!groups.has(root)) groups.set(root, [])
+    groups.get(root).push(report)
+  })
+
+  return [...groups.values()]
+    .filter((group) => group.length >= minReports)
+    .map((group) => {
+      const center = {
+        lat: group.reduce((sum, r) => sum + r.latitude, 0) / group.length,
+        lng: group.reduce((sum, r) => sum + r.longitude, 0) / group.length,
+      }
+      const farthest = group.reduce(
+        (max, r) => Math.max(max, haversineMeters(center, { lat: r.latitude, lng: r.longitude })),
+        0
+      )
+
+      const categoryCounts = new Map()
+      const severities = { low: 0, medium: 0, high: 0, critical: 0 }
+      let score = 0
+      for (const report of group) {
+        categoryCounts.set(report.category, (categoryCounts.get(report.category) ?? 0) + 1)
+        if (severities[report.severity] !== undefined) severities[report.severity] += 1
+        score += severityWeight(report.severity)
+      }
+
+      return {
+        id: `zone-${group.map((r) => r.id).sort()[0]}`,
+        memberIds: group.map((r) => r.id),
+        reports: group,
+        center,
+        // Big enough to hold every member, never wider than the join radius.
+        drawRadius: Math.min(Math.max(farthest + 150, 250), radiusMeters),
+        count: group.length,
+        score,
+        severities,
+        // One high/critical report is enough to call the whole zone high.
+        severityTier: severities.critical + severities.high > 0 ? 'high' : 'moderate',
+        categories: [...categoryCounts.entries()]
+          .map(([category, count]) => ({ category, count }))
+          .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category)),
+        label: areaLabel(group, center, lang),
+      }
+    })
+    .sort((a, b) => b.score - a.score || b.count - a.count)
+}
+
+/** Lat/Lng bounds that fit a zone's circle, for fitBounds calls. */
+export function zoneBounds(zone) {
+  const dLat = zone.drawRadius / METERS_PER_DEG_LAT
+  const dLng =
+    zone.drawRadius / (METERS_PER_DEG_LAT * Math.cos((zone.center.lat * Math.PI) / 180))
+  return [
+    [zone.center.lat - dLat, zone.center.lng - dLng],
+    [zone.center.lat + dLat, zone.center.lng + dLng],
+  ]
+}
+
+/** Human label for a zone join radius: 500 → "500 m", 2500 → "2.5 km". */
+export function formatZoneRadius(radiusMeters) {
+  return radiusMeters >= 1000 ? `${radiusMeters / 1000} km` : `${radiusMeters} m`
 }
 
 // ---------------------------------------------------------------------------
@@ -526,18 +621,18 @@ export async function uploadAvatar(supabase, file, userId) {
 // Formatting
 // ---------------------------------------------------------------------------
 
-export function formatDate(value) {
+export function formatDate(value, lang = 'en') {
   if (!value) return '—'
-  return new Date(value).toLocaleDateString(undefined, {
+  return new Date(value).toLocaleDateString(lang === 'ne' ? 'ne-NP' : undefined, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   })
 }
 
-export function formatDateTime(value) {
+export function formatDateTime(value, lang = 'en') {
   if (!value) return '—'
-  return new Date(value).toLocaleString(undefined, {
+  return new Date(value).toLocaleString(lang === 'ne' ? 'ne-NP' : undefined, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -546,20 +641,23 @@ export function formatDateTime(value) {
   })
 }
 
-export function timeAgo(value) {
+/** "Just now", "5 min ago" … in the reader's language. */
+export function timeAgo(value, lang = 'en') {
   if (!value) return '—'
   const then = new Date(value).getTime()
   if (Number.isNaN(then)) return '—'
   const seconds = Math.round((Date.now() - then) / 1000)
 
-  if (seconds < 60) return 'Just now'
+  if (seconds < 60) return t(lang, 'Just now')
   const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes} min ago`
+  if (minutes < 60) return t(lang, '{n} min ago', { n: minutes })
   const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`
+  if (hours < 24) {
+    return t(lang, hours === 1 ? '{n} hour ago' : '{n} hours ago', { n: hours })
+  }
   const days = Math.round(hours / 24)
-  if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'} ago`
-  return formatDate(value)
+  if (days < 7) return t(lang, days === 1 ? '{n} day ago' : '{n} days ago', { n: days })
+  return formatDate(value, lang)
 }
 
 export function shortId(id) {

@@ -19,14 +19,17 @@ import {
   CATEGORIES,
   ITAHARI_CENTER,
   SEVERITY_CONFIG,
-  STATUS_CONFIG,
   addStatusHistory,
+  categoryLabel,
   createReport,
   reportErrorMessage,
+  severityLabel,
+  statusLabel,
   uploadReportImage,
 } from '@/lib/reports'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { Field, inputClass, inputIdle, inputInvalid } from '@/components/Field'
+import { useLanguage } from '@/components/LanguageContext'
 
 const ItahariMap = dynamic(() => import('@/components/ItahariMap'), {
   ssr: false,
@@ -36,6 +39,7 @@ const ItahariMap = dynamic(() => import('@/components/ItahariMap'), {
 export default function ReportForm() {
   const router = useRouter()
   const supabase = createClient()
+  const { t, lang } = useLanguage()
 
   const [user, setUser] = useState(undefined) // undefined = loading, null = signed out
   const [reporterName, setReporterName] = useState('')
@@ -101,19 +105,19 @@ export default function ReportForm() {
 
   const summary = useMemo(
     () => ({
-      category: category || 'Not selected',
-      severity: SEVERITY_CONFIG[severity]?.label ?? severity,
-      location: locationName || (coords ? 'Pinned on map' : 'Not set'),
+      category: category ? categoryLabel(category, lang) : t('Not selected'),
+      severity: severityLabel(severity, lang),
+      location: locationName || (coords ? t('Pinned on map') : t('Not set')),
     }),
-    [category, severity, locationName, coords]
+    [category, severity, locationName, coords, lang, t]
   )
 
   function validate() {
     const nextErrors = {}
-    if (!title.trim()) nextErrors.title = 'Please enter a report title.'
-    if (!category) nextErrors.category = 'Please select a category.'
-    if (!description.trim()) nextErrors.description = 'Please describe the problem.'
-    if (!locationName.trim()) nextErrors.locationName = 'Please enter the location.'
+    if (!title.trim()) nextErrors.title = t('Please enter a report title.')
+    if (!category) nextErrors.category = t('Please select a category.')
+    if (!description.trim()) nextErrors.description = t('Please describe the problem.')
+    if (!locationName.trim()) nextErrors.locationName = t('Please enter the location.')
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -211,32 +215,31 @@ export default function ReportForm() {
       <div className="mx-auto max-w-3xl space-y-6">
         <Breadcrumbs
           items={[
-            { label: 'Dashboard', href: '/dashboard' },
-            { label: 'Reports', href: '/reports' },
-            { label: 'Report an issue' },
+            { label: t('Dashboard'), href: '/dashboard' },
+            { label: t('Reports'), href: '/reports' },
+            { label: t('Report an issue') },
           ]}
         />
         <div className="card p-6 text-center">
           <span className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-ink/5 text-ink/60">
             <LogIn className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
           </span>
-          <h1 className="text-lg font-semibold text-ink">Sign in to report an issue</h1>
+          <h1 className="text-lg font-semibold text-ink">{t('Sign in to report an issue')}</h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-ink/60">
-            Anyone can read reports. An account keeps reports tied to a real reporter
-            and lets you verify problems in your area.
+            {t('Anyone can read reports. An account keeps reports tied to a real reporter and lets you verify problems in your area.')}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
               href="/login"
               className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
             >
-              Sign in
+              {t('Sign in')}
             </Link>
             <Link
               href="/register"
               className="rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5"
             >
-              Create account
+              {t('Create account')}
             </Link>
           </div>
         </div>
@@ -248,32 +251,31 @@ export default function ReportForm() {
     <div className="mx-auto max-w-3xl space-y-6">
       <Breadcrumbs
         items={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Reports', href: '/reports' },
-          { label: 'Report an issue' },
+          { label: t('Dashboard'), href: '/dashboard' },
+          { label: t('Reports'), href: '/reports' },
+          { label: t('Report an issue') },
         ]}
       />
 
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Report an issue</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">{t('Report an issue')}</h1>
         <p className="mt-1 text-sm text-ink/60">
-          Describe the problem and mark where it is. Reports are published immediately
-          and can be verified by neighbours.
+          {t('Describe the problem and mark where it is. Reports are published immediately and can be verified by neighbours.')}
         </p>
       </div>
 
       {formError ? (
         <div className="flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-ink">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          {formError}
+          {t(formError)}
         </div>
       ) : null}
 
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
         <section className="card p-6">
-          <h2 className="mb-4 text-sm font-bold text-ink">Details</h2>
+          <h2 className="mb-4 text-sm font-bold text-ink">{t('Details')}</h2>
           <div className="space-y-4">
-            <Field id="title" label="Report title" required error={errors.title}>
+            <Field id="title" label={t('Report title')} required error={errors.title}>
               <input
                 id="title"
                 type="text"
@@ -282,7 +284,7 @@ export default function ReportForm() {
                   setTitle(event.target.value)
                   clearError('title')
                 }}
-                placeholder="e.g. Blocked drainage pipe near Ward 4"
+                placeholder={t('e.g. Blocked drainage pipe near Ward 4')}
                 aria-invalid={Boolean(errors.title)}
                 aria-describedby={errors.title ? 'title-error' : undefined}
                 className={`${inputClass} ${errors.title ? inputInvalid : inputIdle}`}
@@ -290,7 +292,7 @@ export default function ReportForm() {
             </Field>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field id="category" label="Category" required error={errors.category}>
+              <Field id="category" label={t('Category')} required error={errors.category}>
                 <select
                   id="category"
                   value={category}
@@ -302,25 +304,25 @@ export default function ReportForm() {
                   aria-describedby={errors.category ? 'category-error' : undefined}
                   className={`${inputClass} ${errors.category ? inputInvalid : inputIdle}`}
                 >
-                  <option value="">Select a category</option>
+                  <option value="">{t('Select a category')}</option>
                   {CATEGORIES.map((item) => (
                     <option key={item} value={item}>
-                      {item}
+                      {categoryLabel(item, lang)}
                     </option>
                   ))}
                 </select>
               </Field>
 
-              <Field id="severity" label="Severity" required>
+              <Field id="severity" label={t('Severity')} required>
                 <select
                   id="severity"
                   value={severity}
                   onChange={(event) => setSeverity(event.target.value)}
                   className={`${inputClass} ${inputIdle}`}
                 >
-                  {Object.entries(SEVERITY_CONFIG).map(([key, config]) => (
+                  {Object.keys(SEVERITY_CONFIG).map((key) => (
                     <option key={key} value={key}>
-                      {config.label}
+                      {severityLabel(key, lang)}
                     </option>
                   ))}
                 </select>
@@ -329,10 +331,10 @@ export default function ReportForm() {
 
             <Field
               id="description"
-              label="Description"
+              label={t('Description')}
               required
               error={errors.description}
-              hint="What is wrong, and how is it affecting people?"
+              hint={t('What is wrong, and how is it affecting people?')}
             >
               <textarea
                 id="description"
@@ -342,7 +344,7 @@ export default function ReportForm() {
                   setDescription(event.target.value)
                   clearError('description')
                 }}
-                placeholder="Describe the problem so neighbours can confirm it."
+                placeholder={t('Describe the problem so neighbours can confirm it.')}
                 aria-invalid={Boolean(errors.description)}
                 aria-describedby={errors.description ? 'description-error' : 'description-hint'}
                 className={`${inputClass} ${errors.description ? inputInvalid : inputIdle}`}
@@ -352,11 +354,11 @@ export default function ReportForm() {
         </section>
 
         <section className="card p-6">
-          <h2 className="mb-4 text-sm font-bold text-ink">Location</h2>
+          <h2 className="mb-4 text-sm font-bold text-ink">{t('Location')}</h2>
           <div className="space-y-4">
             <Field
               id="locationName"
-              label="Address or landmark"
+              label={t('Address or landmark')}
               required
               error={errors.locationName}
             >
@@ -368,7 +370,7 @@ export default function ReportForm() {
                   setLocationName(event.target.value)
                   clearError('locationName')
                 }}
-                placeholder="e.g. Ward 5, near Bus Park"
+                placeholder={t('e.g. Ward 5, near Bus Park')}
                 aria-invalid={Boolean(errors.locationName)}
                 aria-describedby={errors.locationName ? 'locationName-error' : undefined}
                 className={`${inputClass} ${errors.locationName ? inputInvalid : inputIdle}`}
@@ -378,8 +380,8 @@ export default function ReportForm() {
             <div>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-semibold text-ink">
-                  Pinpoint on the map
-                  <span className="ml-1.5 text-xs font-normal text-ink/45">optional</span>
+                  {t('Pinpoint on the map')}
+                  <span className="ml-1.5 text-xs font-normal text-ink/45">{t('optional')}</span>
                 </span>
                 <div className="flex items-center gap-2">
                   {coords ? (
@@ -389,7 +391,7 @@ export default function ReportForm() {
                       className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-ink/60 transition-colors hover:bg-ink/5"
                     >
                       <X className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
-                      Clear pin
+                      {t('Clear pin')}
                     </button>
                   ) : null}
                   <button
@@ -399,7 +401,7 @@ export default function ReportForm() {
                     className="inline-flex items-center gap-1.5 rounded-lg border border-ink/15 px-2.5 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-ink/5 disabled:opacity-50"
                   >
                     <Crosshair className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
-                    {isLocating ? 'Locating…' : 'Use my location'}
+                    {isLocating ? t('Locating…') : t('Use my location')}
                   </button>
                 </div>
               </div>
@@ -410,7 +412,7 @@ export default function ReportForm() {
                   picked={coords ?? ITAHARI_CENTER}
                   zoom={13}
                   showPopups={false}
-                  showAreas={false}
+                  showZones={false}
                   fitToReports={false}
                 />
               </div>
@@ -418,24 +420,26 @@ export default function ReportForm() {
               <p className="mt-2 flex items-center gap-1.5 text-xs text-ink/50">
                 <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
                 {coords
-                  ? `Pin at ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)} — click the map to move it.`
-                  : 'Click the map to place a pin, or use your current location.'}
+                  ? t('Pin at {coords} — click the map to move it.', {
+                      coords: `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`,
+                    })
+                  : t('Click the map to place a pin, or use your current location.')}
               </p>
             </div>
           </div>
         </section>
 
         <section className="card p-6">
-          <h2 className="mb-1 text-sm font-bold text-ink">Photo</h2>
+          <h2 className="mb-1 text-sm font-bold text-ink">{t('Photo')}</h2>
           <p className="mb-4 text-xs text-ink/50">
-            One photo, up to 5 MB. JPG, PNG or WebP. {/* shortcut: one photo per
+            {t('One photo, up to 5 MB. JPG, PNG or WebP.')} {/* shortcut: one photo per
             report (reports.image_url); add a report_images table for galleries. */}
           </p>
 
           {previewUrl ? (
             <div className="relative overflow-hidden rounded-xl ring-1 ring-ink/10">
               {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview */}
-              <img src={previewUrl} alt="Selected report photo" className="max-h-72 w-full object-cover" />
+              <img src={previewUrl} alt={t('Selected report photo')} className="max-h-72 w-full object-cover" />
               <button
                 type="button"
                 onClick={() => {
@@ -445,7 +449,7 @@ export default function ReportForm() {
                 className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-lg bg-ink/75 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-ink"
               >
                 <X className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
-                Remove
+                {t('Remove')}
               </button>
             </div>
           ) : (
@@ -454,8 +458,8 @@ export default function ReportForm() {
               className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/25 bg-ink/5 px-6 py-10 text-center transition-colors hover:border-accent hover:bg-accent/5"
             >
               <ImagePlus className="h-6 w-6 text-ink/40" strokeWidth={1.8} aria-hidden="true" />
-              <span className="text-sm font-medium text-ink">Choose a photo</span>
-              <span className="text-xs text-ink/50">A clear photo helps others confirm the problem.</span>
+              <span className="text-sm font-medium text-ink">{t('Choose a photo')}</span>
+              <span className="text-xs text-ink/50">{t('A clear photo helps others confirm the problem.')}</span>
               <input
                 ref={fileInputRef}
                 id="photo"
@@ -471,26 +475,26 @@ export default function ReportForm() {
         <div className="card p-6">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">
             <Info className="h-4 w-4 text-ink/40" strokeWidth={2} aria-hidden="true" />
-            Before you submit
+            {t('Before you submit')}
           </h2>
           <dl className="grid gap-2 text-sm sm:grid-cols-3">
             <div>
-              <dt className="text-xs text-ink/50">Category</dt>
+              <dt className="text-xs text-ink/50">{t('Category')}</dt>
               <dd className="font-medium text-ink">{summary.category}</dd>
             </div>
             <div>
-              <dt className="text-xs text-ink/50">Severity</dt>
+              <dt className="text-xs text-ink/50">{t('Severity')}</dt>
               <dd className="font-medium text-ink">{summary.severity}</dd>
             </div>
             <div>
-              <dt className="text-xs text-ink/50">Location</dt>
+              <dt className="text-xs text-ink/50">{t('Location')}</dt>
               <dd className="truncate font-medium text-ink">{summary.location}</dd>
             </div>
           </dl>
           <p className="mt-3 text-xs text-ink/50">
-            New reports start as{' '}
-            <span className="font-semibold text-ink/70">{STATUS_CONFIG.pending.label}</span> and
-            appear on the map right away.
+            {t('New reports start as {status} and appear on the map right away.', {
+              status: statusLabel('pending', lang),
+            })}
           </p>
         </div>
 
@@ -499,7 +503,7 @@ export default function ReportForm() {
             href="/reports"
             className="inline-flex items-center justify-center rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5"
           >
-            Cancel
+            {t('Cancel')}
           </Link>
           <button
             type="submit"
@@ -507,7 +511,7 @@ export default function ReportForm() {
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
-            {isSubmitting ? 'Submitting…' : 'Submit report'}
+            {isSubmitting ? t('Submitting…') : t('Submit report')}
           </button>
         </div>
       </form>

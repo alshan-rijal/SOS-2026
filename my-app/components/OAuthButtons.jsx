@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useLanguage } from '@/components/LanguageContext'
 
 const PROVIDERS = [
   {
@@ -32,6 +33,7 @@ const PROVIDERS = [
 ]
 
 export default function OAuthButtons({ onError }) {
+  const { t } = useLanguage()
   const supabase = createClient()
   const [pending, setPending] = useState('')
 
@@ -52,7 +54,7 @@ export default function OAuthButtons({ onError }) {
     <div>
       <div className="my-6 flex items-center gap-4">
         <span className="h-px flex-1 bg-ink/10" />
-        <span className="text-xs font-semibold uppercase tracking-wider text-ink/40">or</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-ink/40">{t('or')}</span>
         <span className="h-px flex-1 bg-ink/10" />
       </div>
 
@@ -66,7 +68,7 @@ export default function OAuthButtons({ onError }) {
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-ink/5 disabled:opacity-60"
           >
             {provider.icon}
-            {pending === provider.id ? 'Connecting…' : provider.label}
+            {pending === provider.id ? t('Connecting…') : provider.label}
           </button>
         ))}
       </div>

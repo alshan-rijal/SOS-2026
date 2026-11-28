@@ -9,18 +9,21 @@ import {
   CATEGORIES,
   PAGE_SIZE,
   SEVERITY_ORDER,
-  SEVERITY_CONFIG,
   SORT_OPTIONS,
   STATUS_CONFIG,
+  categoryLabel,
   fetchMyVerifiedIds,
   fetchReports,
   normalizeReport,
   reportErrorMessage,
   setVerification,
+  severityLabel,
+  statusLabel,
 } from '@/lib/reports'
 import ReportCard, { ReportCardSkeleton } from '@/components/ReportCard'
 import EmptyState from '@/components/EmptyState'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { useLanguage } from '@/components/LanguageContext'
 
 function useDebounced(value, delay = 300) {
   const [debounced, setDebounced] = useState(value)
@@ -39,6 +42,7 @@ export default function ReportsBrowser() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const supabase = createClient()
+  const { t, lang } = useLanguage()
 
   // Filters live in component state but are mirrored to the URL so a filtered
   // view can be linked and bookmarked. Initial values come from the URL.
@@ -177,13 +181,13 @@ export default function ReportsBrowser() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Reports' }]} />
+      <Breadcrumbs items={[{ label: t('Dashboard'), href: '/dashboard' }, { label: t('Reports') }]} />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Reports</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">{t('Reports')}</h1>
           <p className="mt-1 text-sm text-ink/60">
-            Browse and filter every reported problem. Reports are public.
+            {t('Browse and filter every reported problem. Reports are public.')}
           </p>
         </div>
         <Link
@@ -191,14 +195,14 @@ export default function ReportsBrowser() {
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
         >
           <Plus className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
-          Report an issue
+          {t('Report an issue')}
         </Link>
       </div>
 
       <div className="card p-4">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
           <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
-          Filters
+          {t('Filters')}
         </div>
 
         <div className="mt-3 grid gap-3 lg:grid-cols-12">
@@ -209,14 +213,14 @@ export default function ReportsBrowser() {
               aria-hidden="true"
             />
             <label className="sr-only" htmlFor="report-search">
-              Search reports
+              {t('Search reports')}
             </label>
             <input
               id="report-search"
               type="search"
               value={search}
               onChange={(event) => changeFilter(setSearch, event.target.value)}
-              placeholder="Search title, description or location"
+              placeholder={t('Search title, description or location')}
               className={`${selectClass} w-full pl-9`}
             />
           </div>
@@ -224,7 +228,7 @@ export default function ReportsBrowser() {
           <div className="lg:col-span-7 lg:col-start-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
               <label className="sr-only" htmlFor="filter-category">
-                Category
+                {t('Category')}
               </label>
               <select
                 id="filter-category"
@@ -232,10 +236,10 @@ export default function ReportsBrowser() {
                 onChange={(event) => changeFilter(setCategory, event.target.value)}
                 className={`${selectClass} w-full`}
               >
-                <option value="All">All categories</option>
+                <option value="All">{t('All categories')}</option>
                 {CATEGORIES.map((item) => (
                   <option key={item} value={item}>
-                    {item}
+                    {categoryLabel(item, lang)}
                   </option>
                 ))}
               </select>
@@ -243,7 +247,7 @@ export default function ReportsBrowser() {
 
             <div>
               <label className="sr-only" htmlFor="filter-status">
-                Status
+                {t('Status')}
               </label>
               <select
                 id="filter-status"
@@ -251,10 +255,10 @@ export default function ReportsBrowser() {
                 onChange={(event) => changeFilter(setStatus, event.target.value)}
                 className={`${selectClass} w-full`}
               >
-                <option value="all">All statuses</option>
-                {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                <option value="all">{t('All statuses')}</option>
+                {Object.keys(STATUS_CONFIG).map((key) => (
                   <option key={key} value={key}>
-                    {config.label}
+                    {statusLabel(key, lang)}
                   </option>
                 ))}
               </select>
@@ -262,7 +266,7 @@ export default function ReportsBrowser() {
 
             <div>
               <label className="sr-only" htmlFor="filter-severity">
-                Severity
+                {t('Severity')}
               </label>
               <select
                 id="filter-severity"
@@ -270,10 +274,10 @@ export default function ReportsBrowser() {
                 onChange={(event) => changeFilter(setSeverity, event.target.value)}
                 className={`${selectClass} w-full`}
               >
-                <option value="all">All severities</option>
+                <option value="all">{t('All severities')}</option>
                 {SEVERITY_ORDER.map((key) => (
                   <option key={key} value={key}>
-                    {SEVERITY_CONFIG[key].label}
+                    {severityLabel(key, lang)}
                   </option>
                 ))}
               </select>
@@ -281,7 +285,7 @@ export default function ReportsBrowser() {
 
             <div>
               <label className="sr-only" htmlFor="filter-sort">
-                Sort
+                {t('Sort')}
               </label>
               <select
                 id="filter-sort"
@@ -291,7 +295,7 @@ export default function ReportsBrowser() {
               >
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.label)}
                   </option>
                 ))}
               </select>
@@ -305,7 +309,7 @@ export default function ReportsBrowser() {
             onClick={clearFilters}
             className="mt-3 text-xs font-semibold text-ink transition-colors hover:underline"
           >
-            Clear all filters
+            {t('Clear all filters')}
           </button>
         ) : null}
       </div>
@@ -313,7 +317,7 @@ export default function ReportsBrowser() {
       {error ? (
         <div className="flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-ink">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          {error}
+          {t(error)}
         </div>
       ) : null}
 
@@ -326,11 +330,11 @@ export default function ReportsBrowser() {
       ) : reports.length === 0 && !error ? (
         <EmptyState
           icon={hasFilters ? SearchX : Search}
-          title={hasFilters ? 'No reports match these filters' : 'No reports yet'}
+          title={hasFilters ? t('No reports match these filters') : t('No reports yet')}
           description={
             hasFilters
-              ? 'Try a different search term or clear the filters to see everything.'
-              : 'Nothing has been reported yet. Be the first to flag a problem.'
+              ? t('Try a different search term or clear the filters to see everything.')
+              : t('Nothing has been reported yet. Be the first to flag a problem.')
           }
           action={
             hasFilters ? (
@@ -339,7 +343,7 @@ export default function ReportsBrowser() {
                 onClick={clearFilters}
                 className="rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5"
               >
-                Clear filters
+                {t('Clear filters')}
               </button>
             ) : (
               <Link
@@ -347,7 +351,7 @@ export default function ReportsBrowser() {
                 className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
               >
                 <Plus className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
-                Report an issue
+                {t('Report an issue')}
               </Link>
             )
           }
@@ -356,7 +360,12 @@ export default function ReportsBrowser() {
         <>
           <div className="flex items-center justify-between text-xs text-ink/55">
             <span>
-              Showing {rangeStart}–{rangeEnd} of {total} {total === 1 ? 'report' : 'reports'}
+              {t(
+                total === 1
+                  ? 'Showing {from}–{to} of {n} report'
+                  : 'Showing {from}–{to} of {n} reports',
+                { from: rangeStart, to: rangeEnd, n: total }
+              )}
             </span>
           </div>
 
@@ -372,7 +381,7 @@ export default function ReportsBrowser() {
           </div>
 
           {totalPages > 1 ? (
-            <nav className="flex items-center justify-center gap-2 pt-2" aria-label="Pagination">
+            <nav className="flex items-center justify-center gap-2 pt-2" aria-label={t('Pagination')}>
               <button
                 type="button"
                 onClick={() => goToPage(Math.max(1, page - 1))}
@@ -380,11 +389,11 @@ export default function ReportsBrowser() {
                 className="inline-flex items-center gap-1.5 rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
-                Previous
+                {t('Previous')}
               </button>
 
               <span className="px-2 text-sm text-ink/60">
-                Page {page} of {totalPages}
+                {t('Page {page} of {total}', { page, total: totalPages })}
               </span>
 
               <button
@@ -393,7 +402,7 @@ export default function ReportsBrowser() {
                 disabled={page >= totalPages}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next
+                {t('Next')}
                 <ChevronRight className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
               </button>
             </nav>

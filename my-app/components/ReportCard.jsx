@@ -1,15 +1,17 @@
 import Link from 'next/link'
 import { ArrowRight, MapPin, ThumbsUp } from 'lucide-react'
 import { SeverityBadge, StatusBadge } from '@/components/Badges'
-import { timeAgo } from '@/lib/reports'
+import { categoryLabel, timeAgo } from '@/lib/reports'
+import { useLanguage } from '@/components/LanguageContext'
 
 export default function ReportCard({ report, onVerify, isVerifying = false }) {
+  const { t, lang, localize } = useLanguage()
   return (
     <article className="card flex min-w-0 flex-col p-5 transition-shadow duration-150 hover:shadow-[0_12px_32px_rgba(11,74,111,0.12)]">
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <SeverityBadge severity={report.severity} />
         <StatusBadge status={report.status} />
-        <span className="ml-auto text-xs text-ink/50">{timeAgo(report.createdAt)}</span>
+        <span className="ml-auto text-xs text-ink/50">{timeAgo(report.createdAt, lang)}</span>
       </div>
 
       <h3 className="break-words text-base font-semibold leading-snug text-ink">
@@ -21,8 +23,8 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
       <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-ink/55">
         <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
         <span className="truncate">
-          {report.category}
-          {report.locationName ? ` · ${report.locationName}` : ''}
+          {categoryLabel(report.category, lang)}
+          {localize(report, 'locationName') ? ` · ${localize(report, 'locationName')}` : ''}
         </span>
       </p>
 
@@ -34,7 +36,8 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
 
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-ink/10 pt-3">
         <span className="min-w-0 truncate text-xs text-ink/55">
-          Reported by <span className="font-semibold text-ink/75">{report.reporterName}</span>
+          {t('Reported by {name}', { name: '' })}
+          <span className="font-semibold text-ink/75">{report.reporterName}</span>
         </span>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -44,7 +47,11 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
               onClick={() => onVerify(report)}
               disabled={isVerifying}
               aria-pressed={report.verifiedByMe}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
+              aria-label={`${report.verifiedByMe ? t('Verified') : t('Verify')} — ${t(
+                report.verifications === 1 ? '{n} verification' : '{n} verifications',
+                { n: report.verifications }
+              )}`}
+              className={`inline-flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
                 report.verifiedByMe
                   ? 'bg-ink text-white hover:bg-ink/90'
                   : 'bg-ink/5 text-ink hover:bg-ink/10'
@@ -54,7 +61,7 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
               {report.verifications}
             </button>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-ink/5 px-2.5 py-1.5 text-xs font-semibold text-ink/70">
+            <span className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-ink/5 px-2.5 text-xs font-semibold text-ink/70">
               <ThumbsUp className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
               {report.verifications}
             </span>
@@ -62,9 +69,9 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
 
           <Link
             href={`/reports/${report.id}`}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-accent/10"
+            className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-accent/10"
           >
-            Details
+            {t('Details')}
             <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
           </Link>
         </div>

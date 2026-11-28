@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
+import { useLanguage } from '@/components/LanguageContext'
 
 /**
  * Consistent breadcrumb trail.
@@ -10,13 +11,14 @@ import { ChevronRight } from 'lucide-react'
  * and trails longer than four steps collapse their middle.
  */
 export default function Breadcrumbs({ items = [] }) {
+  const { t } = useLanguage()
   if (items.length === 0) return null
 
   const collapsed = items.length > 4
   const visible = collapsed ? [items[0], { ellipsis: true }, ...items.slice(-2)] : items
 
   return (
-    <nav aria-label="Breadcrumb" className="min-w-0">
+    <nav aria-label={t('Breadcrumb')} className="min-w-0">
       <ol className="flex min-w-0 items-center gap-1.5 text-sm">
         {visible.map((item, index) => {
           const isLast = index === visible.length - 1
@@ -40,7 +42,7 @@ export default function Breadcrumbs({ items = [] }) {
                   className="max-w-[16rem] truncate font-semibold text-ink"
                   title={item.label}
                 >
-                  {item.label}
+                  {t(item.label)}
                 </span>
               ) : (
                 <Link
@@ -48,7 +50,7 @@ export default function Breadcrumbs({ items = [] }) {
                   className="max-w-[10rem] truncate text-ink/60 transition-colors hover:text-ink"
                   title={item.label}
                 >
-                  {item.label}
+                  {t(item.label)}
                 </Link>
               )}
             </li>

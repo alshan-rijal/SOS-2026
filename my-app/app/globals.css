@@ -7,7 +7,7 @@
    colour outside #eaf4fb / #0b4a6f / #ff6b5a / #ffffff ever enters the UI.
 --------------------------------------------------------------------------- */
 @theme {
-  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-poppins), var(--font-devanagari), ui-sans-serif, system-ui, sans-serif;
 
   --color-ink: #0b4a6f;
   --color-accent: #ff6b5a;
@@ -20,6 +20,8 @@
   }
 
   body {
+    /* Poppins carries Latin, Noto Sans Devanagari picks up Nepali glyphs. */
+    font-family: var(--font-poppins), var(--font-devanagari), ui-sans-serif, system-ui, sans-serif;
     background-color: var(--color-surface);
     color: var(--color-ink);
   }
@@ -101,6 +103,48 @@
   color: var(--color-ink);
 }
 
+/* Leaflet's own zoom buttons ship at 26–30px. The three-class chain outranks
+   both `.leaflet-bar a` and `.leaflet-touch .leaflet-bar a`, whichever order the
+   two stylesheets land in, so the 40px touch floor always holds. */
+.leaflet-container .leaflet-control-container .leaflet-bar a {
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  font-size: 20px;
+}
+
+/* Attribution stays inside a narrow viewport instead of pushing the map wide. */
+.leaflet-control-attribution {
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+@media (max-width: 640px) {
+  .leaflet-popup-content {
+    margin: 12px 14px;
+  }
+
+  .leaflet-control-attribution {
+    font-size: 9px;
+  }
+}
+
+/* Map viewport: tall enough to read, never a tall empty box on a phone or a
+   short laptop screen. */
+.map-frame {
+  height: clamp(340px, 52vh, 620px);
+}
+
+/* iOS zooms the whole page when a focused control is under 16px. */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Map pins — teardrop divIcons built with inline SVG (no image files).
    Drop-in plays once on mount, a soft pulse runs for high/critical pins, and
@@ -130,15 +174,27 @@
   height: 100%;
 }
 
-.sos-pin-dot {
-  position: absolute;
-  top: 30%;
-  left: 50%;
-  width: calc(var(--pin-size) * 0.32);
-  height: calc(var(--pin-size) * 0.32);
-  transform: translate(-50%, -50%);
-  border-radius: 9999px;
-  background: #ffffff;
+/* The gentle up-and-down bob. Each pin takes its index as a negative delay, so
+   neighbours never bob in lockstep. Reduced motion collapses this to a still
+   frame via the global rule above. */
+.sos-pin-bob {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  animation: pin-bob 2400ms ease-in-out infinite;
+  animation-delay: calc(var(--pin-index, 0) * -170ms);
+  will-change: transform;
+}
+
+@keyframes pin-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-11%);
+  }
 }
 
 .leaflet-marker-icon:hover .sos-pin {
@@ -146,7 +202,9 @@
 }
 
 .sos-pin.is-enter {
-  animation: pin-drop 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* `backwards` (not `both`) so the finished drop does not keep overriding the
+     hover scale with its final keyframe transform. */
+  animation: pin-drop 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   animation-delay: calc(var(--pin-index, 0) * 45ms);
 }
 
@@ -202,7 +260,7 @@
   }
 }
 
-/* Slow pulsing outer ring around the hotspot cell. */
+/* Slow pulsing outer ring used by the landing-page illustration (app/page.js). */
 .hotspot-ring {
   animation: hotspot-pulse 2600ms ease-out infinite;
 }
@@ -218,23 +276,174 @@
   }
 }
 
-/* Small coral label pinned to the highest-problem area. */
-.leaflet-tooltip.sos-hotspot-label {
-  background: #ff6b5a;
-  color: #ffffff;
-  border: 0;
-  border-radius: 9999px;
-  padding: 3px 11px;
-  font-size: 11px;
-  font-weight: 600;
-  box-shadow: 0 6px 16px rgba(11, 74, 111, 0.28);
+/* Problem-prone zone: a severity-coloured outline with a slow soft pulse on a
+   second circle. Reduced motion is handled globally by the prefers-reduced-motion
+   rule above, so the ring simply holds its first frame there. */
+.sos-zone-pulse {
+  animation: zone-pulse 3200ms ease-out infinite;
 }
 
-.leaflet-tooltip.sos-hotspot-label::before {
-  border-top-color: #ff6b5a;
-  border-bottom-color: #ff6b5a;
-  border-left-color: #ff6b5a;
-  border-right-color: #ff6b5a;
+@keyframes zone-pulse {
+  0% {
+    stroke-opacity: 0.8;
+    stroke-width: 2;
+  }
+  70%,
+  100% {
+    stroke-opacity: 0;
+    stroke-width: 12;
+  }
+}
+
+/* Zone label: a white pill with a coral border, lifted above the zone's north
+   edge by a permanent Leaflet tooltip (which is pointer-events: none). */
+.leaflet-tooltip.sos-zone-label-tip {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.leaflet-tooltip.sos-zone-label-tip::before {
+  display: none;
+}
+
+.sos-zone-pill {
+  display: inline-block;
+  border-radius: 9999px;
+  border: 1.5px solid #ff6b5a;
+  background: #ffffff;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0b4a6f;
+  box-shadow: 0 6px 16px rgba(11, 74, 111, 0.18);
+}
+
+/* Zones without a high/critical report read navy instead of coral. */
+.sos-zone-pill.is-moderate {
+  border-color: #0b4a6f;
+}
+
+.sos-zone-short {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .sos-zone-full {
+    display: none;
+  }
+
+  .sos-zone-short {
+    display: inline;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Header popups — a short fade-and-slide so a menu reads as attached to its
+   trigger. The global prefers-reduced-motion rule collapses this to instant.
+--------------------------------------------------------------------------- */
+.account-popup,
+.bell-popup {
+  animation: menu-in 150ms ease-out backwards;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Event pins — a white rounded badge with the category icon, a coral border and
+   a pointer whose tip lands on the coordinate. Only the inner element animates,
+   never the Leaflet marker element itself.
+--------------------------------------------------------------------------- */
+.event-pin-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.event-pin-inner {
+  display: block;
+  position: relative;
+  width: var(--b);
+  height: var(--h);
+}
+
+.event-pin-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--b);
+  height: var(--b);
+  background: #ffffff;
+  border: 3px solid #ff6b5a;
+  border-radius: 12px;
+  box-shadow: 0 6px 14px rgba(11, 74, 111, 0.28);
+}
+
+.event-pin-badge svg {
+  width: 62%;
+  height: 62%;
+}
+
+.event-pin-tip {
+  position: absolute;
+  top: calc(var(--b) - 2px);
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 9px solid #ff6b5a;
+}
+
+.event-pin-inner.is-enter {
+  animation: event-pin-drop 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+.leaflet-marker-icon:hover .event-pin-inner {
+  transform: translateY(-2px);
+}
+
+@keyframes event-pin-drop {
+  0% {
+    transform: translateY(-90%) scale(0.7);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Today's event circles get a slow breath; reduced motion holds the first frame. */
+.event-zone-pulse {
+  animation: event-zone-pulse 3000ms ease-out infinite;
+}
+
+@keyframes event-zone-pulse {
+  0% {
+    stroke-opacity: 0.7;
+    stroke-width: 2;
+  }
+  70%,
+  100% {
+    stroke-opacity: 0;
+    stroke-width: 10;
+  }
 }
 
 /* ---------------------------------------------------------------------------

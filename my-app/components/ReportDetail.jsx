@@ -23,6 +23,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   STATUS_CONFIG,
   STATUS_ORDER,
+  categoryLabel,
   fetchMyVerifiedIds,
   fetchProfile,
   fetchReport,
@@ -34,6 +35,7 @@ import {
   reportErrorMessage,
   setVerification,
   shortId,
+  statusLabel,
   timeAgo,
   updateReportStatus,
 } from '@/lib/reports'
@@ -42,6 +44,7 @@ import ReportImage from '@/components/ReportImage'
 import Avatar from '@/components/Avatar'
 import EmptyState from '@/components/EmptyState'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { useLanguage } from '@/components/LanguageContext'
 
 const ItahariMap = dynamic(() => import('@/components/ItahariMap'), {
   ssr: false,
@@ -93,6 +96,7 @@ export default function ReportDetail() {
   const searchParams = useSearchParams()
   const justCreated = searchParams.get('created') === '1'
   const supabase = createClient()
+  const { t, lang, localize } = useLanguage()
 
   const [report, setReport] = useState(null)
   const [history, setHistory] = useState([])
@@ -222,15 +226,15 @@ export default function ReportDetail() {
       <div className="mx-auto max-w-2xl space-y-4">
         <Breadcrumbs
           items={[
-            { label: 'Dashboard', href: '/dashboard' },
-            { label: 'Reports', href: '/reports' },
-            { label: 'Report' },
+            { label: t('Dashboard'), href: '/dashboard' },
+            { label: t('Reports'), href: '/reports' },
+            { label: t('Report') },
           ]}
         />
         <div className="flex flex-col items-start gap-3 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm font-medium text-ink">
           <span className="flex items-start gap-2.5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-            {error}
+            {t(error)}
           </span>
           <button
             type="button"
@@ -238,7 +242,7 @@ export default function ReportDetail() {
             className="inline-flex items-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-accent/10"
           >
             <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
-            Try again
+            {t('Try again')}
           </button>
         </div>
       </div>
@@ -250,21 +254,21 @@ export default function ReportDetail() {
       <div className="mx-auto max-w-2xl space-y-4">
         <Breadcrumbs
           items={[
-            { label: 'Dashboard', href: '/dashboard' },
-            { label: 'Reports', href: '/reports' },
-            { label: 'Report' },
+            { label: t('Dashboard'), href: '/dashboard' },
+            { label: t('Reports'), href: '/reports' },
+            { label: t('Report') },
           ]}
         />
         <EmptyState
           icon={FileQuestion}
-          title="Report not found"
-          description="This report may have been removed, or the link is incorrect."
+          title={t('Report not found')}
+          description={t('This report may have been removed, or the link is incorrect.')}
           action={
             <Link
               href="/reports"
               className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90"
             >
-              Back to reports
+              {t('Back to reports')}
             </Link>
           }
         />
@@ -276,13 +280,14 @@ export default function ReportDetail() {
     ? `https://www.openstreetmap.org/?mlat=${report.latitude}&mlon=${report.longitude}#map=17/${report.latitude}/${report.longitude}`
     : null
   const reporterName = reporter?.full_name || report.reporterName
+  const locationName = localize(report, 'locationName')
 
   return (
     <div className="space-y-6">
       <Breadcrumbs
         items={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Reports', href: '/reports' },
+          { label: t('Dashboard'), href: '/dashboard' },
+          { label: t('Reports'), href: '/reports' },
           { label: report.title },
         ]}
       />
@@ -290,7 +295,7 @@ export default function ReportDetail() {
       {justCreated ? (
         <div className="flex items-start gap-2.5 rounded-xl border border-ink/20 bg-ink/5 p-4 text-sm font-medium text-ink">
           <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          Report submitted successfully. It is now visible on the map.
+          {t('Report submitted successfully. It is now visible on the map.')}
         </div>
       ) : null}
 
@@ -303,13 +308,17 @@ export default function ReportDetail() {
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink/60 transition-colors duration-150 hover:text-ink"
             >
               <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
-              Back to reports
+              {t('Back to reports')}
             </Link>
             <h1 className="mt-1.5 break-words text-xl font-bold leading-snug tracking-tight text-ink sm:text-2xl">
               {report.title}
             </h1>
             <p className="mt-1 text-xs text-ink/55">
-              Report ID {shortId(report.id)} · {report.category} · reported {timeAgo(report.createdAt)}
+              {t('Report ID {id} · {category} · reported {when}', {
+                id: shortId(report.id),
+                category: categoryLabel(report.category, lang),
+                when: timeAgo(report.createdAt, lang),
+              })}
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -322,38 +331,41 @@ export default function ReportDetail() {
       {error ? (
         <div className="flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm font-medium text-ink">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          {error}
+          {t(error)}
         </div>
       ) : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-12">
         {/* Main column */}
         <div className="space-y-6 lg:col-span-8">
-          <SectionCard title="Description">
+          <SectionCard title={t('Description')}>
             {report.description ? (
               <p className="whitespace-pre-line text-sm leading-relaxed text-ink/80">
                 {report.description}
               </p>
             ) : (
-              <p className="text-sm text-ink/60">No description was provided.</p>
+              <p className="text-sm text-ink/60">{t('No description was provided.')}</p>
             )}
             {!report.imageUrl ? (
               <p className="mt-3 flex items-center gap-2 text-xs font-medium text-ink/55">
                 <span className="h-1.5 w-1.5 rounded-full bg-ink/30" aria-hidden="true" />
-                No photo attached
+                {t('No photo attached')}
               </p>
             ) : null}
           </SectionCard>
 
           {report.imageUrl ? (
-            <SectionCard title="Photo">
-              <ReportImage src={report.imageUrl} alt={`Photo for: ${report.title}`} />
+            <SectionCard title={t('Photo')}>
+              <ReportImage
+                src={report.imageUrl}
+                alt={t('Photo for: {title}', { title: report.title })}
+              />
             </SectionCard>
           ) : null}
 
-          <SectionCard title="Progress timeline" icon={History}>
+          <SectionCard title={t('Progress timeline')} icon={History}>
             {history.length === 0 ? (
-              <p className="text-sm text-ink/60">No status changes recorded yet.</p>
+              <p className="text-sm text-ink/60">{t('No status changes recorded yet.')}</p>
             ) : (
               <ol className="relative space-y-5 border-l border-ink/10 pl-5">
                 {history.map((entry) => {
@@ -364,9 +376,9 @@ export default function ReportDetail() {
                       <span className={`absolute -left-[1.875rem] flex h-5 w-5 items-center justify-center rounded-full border ring-4 ring-white ${config.badge}`}>
                         <Icon className="h-3 w-3" strokeWidth={2.4} aria-hidden="true" />
                       </span>
-                      <p className="text-sm font-semibold text-ink">{config.label}</p>
+                      <p className="text-sm font-semibold text-ink">{statusLabel(entry.status, lang)}</p>
                       {entry.note ? <p className="mt-0.5 text-sm text-ink/70">{entry.note}</p> : null}
-                      <p className="mt-0.5 text-xs text-ink/50">{formatDateTime(entry.created_at)}</p>
+                      <p className="mt-0.5 text-xs text-ink/50">{formatDateTime(entry.created_at, lang)}</p>
                     </li>
                   )
                 })}
@@ -377,28 +389,28 @@ export default function ReportDetail() {
 
         {/* Side column */}
         <aside className="space-y-6 lg:col-span-4">
-          <SectionCard title="Status & actions">
+          <SectionCard title={t('Status & actions')}>
             <dl className="space-y-3 text-sm">
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink/60">Status</dt>
+                <dt className="text-ink/60">{t('Status')}</dt>
                 <dd>
                   <StatusBadge status={report.status} />
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink/60">Severity</dt>
+                <dt className="text-ink/60">{t('Severity')}</dt>
                 <dd>
                   <SeverityBadge severity={report.severity} />
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink/60">Category</dt>
+                <dt className="text-ink/60">{t('Category')}</dt>
                 <dd className="min-w-0 truncate text-right font-medium text-ink" title={report.category}>
-                  {report.category}
+                  {categoryLabel(report.category, lang)}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="shrink-0 text-ink/60">Reported by</dt>
+                <dt className="shrink-0 text-ink/60">{t('Reported by')}</dt>
                 <dd className="flex min-w-0 items-center gap-2">
                   <Avatar src={reporter?.avatar_url} name={reporterName} size={22} />
                   <span className="min-w-0 truncate font-medium text-ink" title={reporterName}>
@@ -409,22 +421,22 @@ export default function ReportDetail() {
               <div className="flex items-center justify-between gap-3">
                 <dt className="flex items-center gap-1.5 text-ink/60">
                   <Clock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
-                  Reported
+                  {t('Reported')}
                 </dt>
-                <dd className="text-right font-medium text-ink">{formatDateTime(report.createdAt)}</dd>
+                <dd className="text-right font-medium text-ink">{formatDateTime(report.createdAt, lang)}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="flex items-center gap-1.5 text-ink/60">
                   <CalendarClock className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
-                  Last updated
+                  {t('Last updated')}
                 </dt>
-                <dd className="text-right font-medium text-ink">{timeAgo(report.updatedAt)}</dd>
+                <dd className="text-right font-medium text-ink">{timeAgo(report.updatedAt, lang)}</dd>
               </div>
             </dl>
 
             {isOwner ? (
               <p className="mt-5 rounded-lg bg-surface px-3 py-2.5 text-center text-sm font-semibold text-ink">
-                You reported this
+                {t('You reported this')}
               </p>
             ) : (
               <button
@@ -440,16 +452,16 @@ export default function ReportDetail() {
               >
                 <ThumbsUp className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
                 {report.verifiedByMe
-                  ? `Verified · ${report.verifications}`
-                  : `Verify this report · ${report.verifications}`}
+                  ? t('Verified · {n}', { n: report.verifications })
+                  : t('Verify this report · {n}', { n: report.verifications })}
               </button>
             )}
             {!user ? (
               <p className="mt-2 text-center text-xs text-ink/60">
                 <Link href="/login" className="font-semibold text-ink hover:underline">
-                  Sign in
+                  {t('Sign in')}
                 </Link>{' '}
-                to verify.
+                {t('to verify.')}
               </p>
             ) : null}
 
@@ -457,11 +469,11 @@ export default function ReportDetail() {
               <form onSubmit={handleStatusUpdate} className="mt-5 border-t border-ink/10 pt-5">
                 <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink/60">
                   <Pencil className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
-                  Update status
+                  {t('Update status')}
                 </h3>
                 <div className="mt-3 space-y-2.5">
                   <label className="sr-only" htmlFor="next-status">
-                    New status
+                    {t('New status')}
                   </label>
                   <select
                     id="next-status"
@@ -471,19 +483,19 @@ export default function ReportDetail() {
                   >
                     {STATUS_ORDER.map((key) => (
                       <option key={key} value={key}>
-                        {STATUS_CONFIG[key].label}
+                        {statusLabel(key, lang)}
                       </option>
                     ))}
                   </select>
                   <label className="sr-only" htmlFor="status-note">
-                    Note
+                    {t('Note')}
                   </label>
                   <input
                     id="status-note"
                     type="text"
                     value={statusNote}
                     onChange={(event) => setStatusNote(event.target.value)}
-                    placeholder="Add a note (optional)"
+                    placeholder={t('Add a note (optional)')}
                     className="w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                   />
                   <button
@@ -491,7 +503,7 @@ export default function ReportDetail() {
                     disabled={isUpdatingStatus || nextStatus === report.status}
                     className="w-full rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isUpdatingStatus ? 'Updating…' : 'Save status'}
+                    {isUpdatingStatus ? t('Updating…') : t('Save status')}
                   </button>
                 </div>
               </form>
@@ -499,7 +511,7 @@ export default function ReportDetail() {
           </SectionCard>
 
           <SectionCard
-            title="Location"
+            title={t('Location')}
             icon={MapPin}
             action={
               externalMapUrl ? (
@@ -509,15 +521,15 @@ export default function ReportDetail() {
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink transition-colors duration-150 hover:underline"
                 >
-                  Open in map
+                  {t('Open in map')}
                   <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
                 </a>
               ) : null
             }
           >
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <p className="min-w-0 truncate text-sm font-medium text-ink" title={report.locationName || 'No address given'}>
-                {report.locationName || 'No address given'}
+              <p className="min-w-0 truncate text-sm font-medium text-ink" title={locationName || t('No address given')}>
+                {locationName || t('No address given')}
               </p>
               {hasCoords(report) ? (
                 <p className="text-xs tabular-nums text-ink/55">
@@ -533,21 +545,21 @@ export default function ReportDetail() {
                   zoom={15}
                   height="16rem"
                   showPopups={false}
-                  showAreas={false}
+                  showZones={false}
                   className="w-full"
                 />
               </div>
             ) : (
               <p className="mt-3 rounded-lg border border-dashed border-ink/20 bg-ink/5 px-3 py-3 text-center text-xs text-ink/55">
-                This report has no map location.
+                {t('This report has no map location.')}
               </p>
             )}
           </SectionCard>
 
-          <SectionCard title="Verified by">
+          <SectionCard title={t('Verified by')}>
             {verifiers.length === 0 ? (
               <p className="text-sm text-ink/60">
-                No verifications yet. Be the first to confirm this problem.
+                {t('No verifications yet. Be the first to confirm this problem.')}
               </p>
             ) : (
               <div className="flex items-center gap-3">
@@ -564,16 +576,22 @@ export default function ReportDetail() {
                 </div>
                 <p className="text-sm text-ink/70">
                   <span className="font-semibold text-ink">{report.verifications}</span>{' '}
-                  {report.verifications === 1 ? 'person verified' : 'people verified'} this report.
+                  {t(
+                    report.verifications === 1
+                      ? 'person verified this report.'
+                      : 'people verified this report.'
+                  )}
                 </p>
               </div>
             )}
           </SectionCard>
 
-          <SectionCard title="Similar reports nearby">
+          <SectionCard title={t('Similar reports nearby')}>
             {similar.length === 0 ? (
               <p className="text-sm text-ink/60">
-                No other {report.category} reports within 500 m.
+                {t('No other {category} reports within 500 m.', {
+                  category: categoryLabel(report.category, lang),
+                })}
               </p>
             ) : (
               <ul className="space-y-3">
@@ -591,8 +609,8 @@ export default function ReportDetail() {
                         {item.title}
                       </span>
                       <span className="mt-0.5 block truncate text-xs text-ink/60">
-                        {timeAgo(item.createdAt)}
-                        {item.locationName ? ` · ${item.locationName}` : ''}
+                        {timeAgo(item.createdAt, lang)}
+                        {localize(item, 'locationName') ? ` · ${localize(item, 'locationName')}` : ''}
                       </span>
                     </Link>
                   </li>

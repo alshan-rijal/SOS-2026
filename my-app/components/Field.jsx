@@ -1,4 +1,5 @@
 import { AlertCircle } from 'lucide-react'
+import { useLanguage } from '@/components/LanguageContext'
 
 export const inputClass =
   'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-ink transition-colors placeholder:text-ink/40 focus:outline-none focus:ring-2'
@@ -17,6 +18,7 @@ export function describedBy(id, error, hint) {
 
 /** Label + control + inline error/hint. `children` is the control. */
 export function Field({ id, label, required = false, optional = false, error, hint, children }) {
+  const { t } = useLanguage()
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-ink">
@@ -26,7 +28,9 @@ export function Field({ id, label, required = false, optional = false, error, hi
             *
           </span>
         ) : null}
-        {optional ? <span className="ml-1.5 text-xs font-normal text-ink/45">optional</span> : null}
+        {optional ? (
+          <span className="ml-1.5 text-xs font-normal text-ink/45">{t('optional')}</span>
+        ) : null}
       </label>
       {children}
       {error ? (
