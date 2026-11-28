@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, MapPin, ThumbsUp } from 'lucide-react'
+import { ArrowRight, Lock, MapPin, ThumbsUp } from 'lucide-react'
 import { SeverityBadge, StatusBadge } from '@/components/Badges'
 import { categoryLabel, timeAgo } from '@/lib/reports'
 import { useLanguage } from '@/components/LanguageContext'
@@ -11,6 +11,12 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <SeverityBadge severity={report.severity} />
         <StatusBadge status={report.status} />
+        {report.isConfidential ? (
+          <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-ink bg-surface px-2.5 text-xs font-semibold text-ink">
+            <Lock className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
+            {t('Confidential')}
+          </span>
+        ) : null}
         <span className="ml-auto text-xs text-ink/50">{timeAgo(report.createdAt, lang)}</span>
       </div>
 

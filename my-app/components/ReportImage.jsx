@@ -1,18 +1,55 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ImageOff, X, ZoomIn } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { signedImageUrl } from '@/lib/reports'
 import { useLanguage } from '@/components/LanguageContext'
 
 /**
  * Report photo with a loading shimmer, an error fallback, and a click-to-enlarge
  * overlay. Escape or the backdrop closes the overlay.
+ *
+ * Confidential photos are stored as a private-bucket path and shown through a
+ * 60-minute signed URL; pass `confidential` for those.
  */
-export default function ReportImage({ src, alt }) {
+export default function ReportImage({ src, alt, confidential = false }) {
   const { t } = useLanguage()
+  const supabase = useMemo(() => createClient(), [])
   const [isOpen, setIsOpen] = useState(false)
+  const [resolvedSrc, setResolvedSrc] = useState(confidential ? '' : src || '')
   const [status, setStatus] = useState('loading')
   const closeRef = useRef(null)
+
+  useEffect(() => {
+    let active = true
+    // Deferred so the state writes are not synchronous inside the effect.
+    Promise.resolve().then(() => {
+      if (!active) return undefined
+      if (!src) {
+        setResolvedSrc('')
+        return undefined
+      }
+      if (!confidential || /^https?:/.test(src)) {
+        setResolvedSrc(src)
+        return undefined
+      }
+      return signedImageUrl(supabase, src)
+        .then((url) => {
+          if (active) setResolvedSrc(url)
+        })
+        .catch(() => {
+          if (active) setResolvedSrc('')
+        })
+    })
+    return () => {
+      active = false
+    }
+  }, [src, confidential, supabase])
+
+  useEffect(() => {
+    Promise.resolve().then(() => setStatus('loading'))
+  }, [resolvedSrc])
 
   // An image that finished loading before hydration never fires `onLoad`, so read
   // the DOM node's own state on mount as well.
@@ -36,7 +73,7 @@ export default function ReportImage({ src, alt }) {
     }
   }, [isOpen])
 
-  if (!src) return null
+  if (!resolvedSrc) return null
 
   return (
     <>
@@ -60,7 +97,7 @@ export default function ReportImage({ src, alt }) {
              remote Supabase Storage URLs of unknown dimensions, not build-time assets. */
           <img
             ref={attachImage}
-            src={src}
+            src={resolvedSrc}
             alt={alt}
             loading="lazy"
             onLoad={() => setStatus('loaded')}
@@ -98,7 +135,7 @@ export default function ReportImage({ src, alt }) {
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={src}
+            src={resolvedSrc}
             alt={alt}
             onClick={(event) => event.stopPropagation()}
             className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl"

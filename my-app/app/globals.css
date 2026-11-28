@@ -341,6 +341,24 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Status stepper — the current step breathes a soft coral ring. The global
+   prefers-reduced-motion rule collapses this to a still frame.
+--------------------------------------------------------------------------- */
+.stepper-current {
+  animation: stepper-pulse 1800ms ease-in-out infinite;
+}
+
+@keyframes stepper-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 107, 90, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(255, 107, 90, 0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Header popups — a short fade-and-slide so a menu reads as attached to its
    trigger. The global prefers-reduced-motion rule collapses this to instant.
 --------------------------------------------------------------------------- */

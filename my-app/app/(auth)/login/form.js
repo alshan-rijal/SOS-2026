@@ -44,22 +44,36 @@ export default function LoginForm() {
     if (!validate()) return
 
     setIsLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
     setIsLoading(false)
 
-    if (error) {
+    if (error || !data?.user) {
       setServerError(
-        error.message === 'Invalid login credentials'
+        error?.message === 'Invalid login credentials'
           ? 'Email or password is incorrect.'
-          : error.message
+          : error?.message || 'Sign in failed. Please try again.'
       )
       return
     }
 
-    router.push(nextPath)
+    // Admins land in the admin panel after a normal login; everyone else keeps
+    // their original destination. An admin next path must stay inside /admin.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .maybeSingle()
+    const destination =
+      profile?.role === 'admin'
+        ? nextPath.startsWith('/admin')
+          ? nextPath
+          : '/admin'
+        : nextPath
+
+    router.push(destination)
     router.refresh()
   }
 

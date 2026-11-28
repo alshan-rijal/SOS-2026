@@ -15,6 +15,7 @@ import {
   Menu,
   Plus,
   Settings,
+  ShieldCheck,
   User,
   X,
 } from 'lucide-react'
@@ -91,10 +92,15 @@ function RouteWatcher({ onChange }) {
   return null
 }
 
-function AccountPopup({ id, open, displayName, email, avatarUrl, stats, onClose }) {
+function AccountPopup({ id, open, displayName, email, avatarUrl, stats, isAdmin, onClose }) {
   const { t } = useLanguage()
   const itemRefs = useRef([])
   const router = useRouter()
+
+  // Admins get a quick way back into the panel, above Profile.
+  const items = isAdmin
+    ? [{ href: '/admin', label: 'Admin panel', icon: ShieldCheck }, ...ACCOUNT_MENU]
+    : ACCOUNT_MENU
 
   if (!open) return null
 
@@ -155,7 +161,7 @@ function AccountPopup({ id, open, displayName, email, avatarUrl, stats, onClose 
       <div className="my-1.5 border-t border-ink/10" />
 
       <div className="space-y-0.5">
-        {ACCOUNT_MENU.map(({ href, label, icon: Icon }, index) => (
+        {items.map(({ href, label, icon: Icon }, index) => (
           <Link
             key={href}
             href={href}
@@ -178,7 +184,7 @@ function AccountPopup({ id, open, displayName, email, avatarUrl, stats, onClose 
         type="button"
         role="menuitem"
         ref={(node) => {
-          itemRefs.current[ACCOUNT_MENU.length] = node
+          itemRefs.current[items.length] = node
         }}
         onClick={handleLogout}
         className="flex h-11 w-full items-center gap-3 rounded-lg px-2.5 text-sm font-semibold text-accent transition-colors duration-150 hover:bg-accent/10"
@@ -269,6 +275,8 @@ export default function AppHeader({ fluid = false }) {
   const [user, setUser] = useState(undefined) // undefined = loading
   const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showAdminBar, setShowAdminBar] = useState(false)
   const [openMenu, setOpenMenu] = useState(null) // 'account' | 'bell' | 'mobile'
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -289,6 +297,7 @@ export default function AppHeader({ fluid = false }) {
         setUser(null)
         setDisplayName('')
         setAvatarUrl('')
+        setIsAdmin(false)
         setNotifications([])
         setUnreadCount(0)
         return
@@ -304,6 +313,7 @@ export default function AppHeader({ fluid = false }) {
       const meta = currentUser.user_metadata || {}
       setDisplayName(profile?.full_name || meta.full_name || meta.name || '')
       setAvatarUrl(profile?.avatar_url || meta.avatar_url || meta.picture || '')
+      setIsAdmin(profile?.role === 'admin')
       setUser(currentUser)
     }
 
@@ -368,6 +378,41 @@ export default function AppHeader({ fluid = false }) {
       active = false
     }
   }, [openMenu, user, supabase])
+
+  // The slim "viewing as admin" bar is hidden for the rest of the session once
+  // dismissed. sessionStorage is wrapped because it throws in some private modes.
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      if (!isAdmin) {
+        setShowAdminBar(false)
+        return
+      }
+      try {
+        setShowAdminBar(sessionStorage.getItem('sajha:hide-admin-bar') !== '1')
+      } catch {
+        setShowAdminBar(true)
+      }
+    })
+  }, [isAdmin])
+
+  function hideAdminBar() {
+    setShowAdminBar(false)
+    try {
+      sessionStorage.setItem('sajha:hide-admin-bar', '1')
+    } catch {
+      // Nothing to remember — the bar just hides for this render.
+    }
+  }
+
+  function backToAdmin() {
+    let target = '/admin'
+    try {
+      target = sessionStorage.getItem('sajha:last-admin-path') || '/admin'
+    } catch {
+      // Fall through to the Overview.
+    }
+    router.push(target)
+  }
 
   const closeMenus = useCallback(() => setOpenMenu(null), [])
   const closeAccount = useCallback((toButton = false) => {
@@ -473,6 +518,18 @@ export default function AppHeader({ fluid = false }) {
     </button>
   )
 
+  const adminButton = (
+    <Link
+      href="/admin"
+      aria-label={t('Admin panel')}
+      title={t('Admin panel')}
+      className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90 max-[899px]:w-10 max-[899px]:px-0"
+    >
+      <ShieldCheck className="h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+      <span className="max-[899px]:sr-only">{t('Admin panel')}</span>
+    </Link>
+  )
+
   const reportButton = (
     <Link
       href="/reports/new"
@@ -514,6 +571,7 @@ export default function AppHeader({ fluid = false }) {
 
         <div className="ml-auto flex items-center gap-2 min-[900px]:ml-0">
           <LanguageToggle className="mr-1 hidden min-[900px]:inline-flex" />
+          {isAdmin ? adminButton : null}
           {signedIn ? (
             <>
               <span className="relative order-2 min-[900px]:order-1" data-menu-root="bell">
@@ -538,6 +596,7 @@ export default function AppHeader({ fluid = false }) {
                   email={email}
                   avatarUrl={avatarUrl}
                   stats={stats}
+                  isAdmin={isAdmin}
                   onClose={closeAccount}
                 />
               </span>
@@ -564,6 +623,36 @@ export default function AppHeader({ fluid = false }) {
           )}
         </div>
       </div>
+
+      {isAdmin && showAdminBar ? (
+        <div className="border-t border-ink/10 bg-surface print:hidden">
+          <div
+            className={
+              fluid
+                ? 'landing-container flex h-10 items-center gap-2 text-xs'
+                : 'mx-auto flex h-10 w-full max-w-[1760px] items-center gap-2 px-[clamp(16px,3vw,48px)] text-xs'
+            }
+          >
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-ink" strokeWidth={2.2} aria-hidden="true" />
+            <span className="truncate text-ink/70">{t('You are viewing the public site as an admin')}</span>
+            <button
+              type="button"
+              onClick={backToAdmin}
+              className="ml-auto inline-flex h-7 shrink-0 items-center rounded-lg border border-ink bg-white px-2.5 font-semibold text-ink transition-colors duration-150 hover:bg-surface"
+            >
+              {t('Back to admin panel')}
+            </button>
+            <button
+              type="button"
+              onClick={hideAdminBar}
+              aria-label={t('Hide')}
+              className="shrink-0 rounded-md p-1 text-ink/50 transition-colors hover:text-ink"
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {openMenu === 'mobile' ? (
         <div

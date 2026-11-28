@@ -49,7 +49,7 @@ import EmptyState from '@/components/EmptyState'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { useLanguage } from '@/components/LanguageContext'
 
-const STATUS_FILTERS = ['all', 'pending', 'in_progress', 'resolved']
+const STATUS_FILTERS = ['all', 'reported', 'under_verification', 'in_progress', 'fixed', 'cannot_fix']
 
 // Tabs mirror the account menu in the header.
 const TABS = [
@@ -410,7 +410,7 @@ export default function ProfileView() {
   const stats = {
     submitted: reports.length,
     verified: reports.filter((report) => report.verifications > 0).length,
-    resolved: reports.filter((report) => report.status === 'resolved').length,
+    resolved: reports.filter((report) => report.status === 'fixed').length,
     given: verificationsGiven,
   }
 

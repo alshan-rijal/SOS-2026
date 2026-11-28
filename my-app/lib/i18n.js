@@ -12,6 +12,7 @@ import { NE_LANDING } from './i18n/landing.js'
 import { NE_AUTH } from './i18n/auth.js'
 import { NE_REPORTS } from './i18n/reports.js'
 import { NE_PAGES } from './i18n/pages.js'
+import { NE_ADMIN } from './i18n/admin.js'
 
 export const LANGUAGES = [
   { code: 'en', label: 'English', nativeLabel: 'English', short: 'EN', region: 'United States' },
@@ -28,7 +29,15 @@ export function normalizeLang(value) {
 
 // `{name}` placeholders are substituted from the `vars` argument.
 export function t(lang, text, vars) {
-  let out = lang === 'ne' ? NE[text] ?? text : text
+  let out = text
+  if (lang === 'ne') {
+    if (NE[text] === undefined && process.env.NODE_ENV === 'development') {
+      // A missing Nepali key falls back to English; the warning points the
+      // translator at the gap without breaking the screen.
+      console.warn('[i18n] missing Nepali copy for:', text)
+    }
+    out = NE[text] ?? text
+  }
   if (vars) {
     for (const [key, value] of Object.entries(vars)) {
       out = out.split(`{${key}}`).join(String(value))
@@ -372,4 +381,4 @@ const NE_CORE = {
   Cancelled: 'रद्द',
 }
 
-const NE = { ...NE_CORE, ...NE_LANDING, ...NE_AUTH, ...NE_REPORTS, ...NE_PAGES }
+const NE = { ...NE_CORE, ...NE_LANDING, ...NE_AUTH, ...NE_REPORTS, ...NE_PAGES, ...NE_ADMIN }

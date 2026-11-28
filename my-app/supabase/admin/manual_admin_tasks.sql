@@ -1,0 +1,61 @@
+-- supabase/admin/manual_admin_tasks.sql
+-- Hand-run statements for the Supabase SQL Editor. Nothing here is a migration
+-- and nothing here runs automatically. Copy one block at a time.
+
+-- ---------------------------------------------------------------------------
+-- Promote a user to admin (the only supported way — there is no create-admin
+-- screen in the app). Replace the email.
+-- ---------------------------------------------------------------------------
+-- update public.profiles
+-- set role = 'admin'
+-- where id = (select id from auth.users where email = 'authority@example.com');
+--
+-- select p.id, u.email, p.role
+-- from public.profiles p join auth.users u on u.id = p.id
+-- where p.role = 'admin';
+
+-- ---------------------------------------------------------------------------
+-- List confidential reports (admins only; run in the SQL Editor where
+-- auth.uid() is null).
+-- ---------------------------------------------------------------------------
+-- select id, title, category, severity, status, created_at, user_id
+-- from public.reports
+-- where is_confidential
+-- order by created_at desc;
+
+-- ---------------------------------------------------------------------------
+-- Change a report status with a reason. Replace the id and status.
+-- Allowed values: reported, under_verification, in_progress, fixed, cannot_fix.
+-- The reports_log_status trigger writes the history row for you.
+-- ---------------------------------------------------------------------------
+-- update public.reports
+-- set status = 'under_verification',
+--     status_reason = 'Ward engineer assigned on inspection.'
+-- where id = '00000000-0000-0000-0000-000000000000';
+
+-- ---------------------------------------------------------------------------
+-- Mark a report cannot_fix. The status_reason must be at least 10 characters
+-- (enforced by reports_cannot_fix_reason_check).
+-- ---------------------------------------------------------------------------
+-- update public.reports
+-- set status = 'cannot_fix',
+--     status_reason = 'Private property — outside municipal jurisdiction.'
+-- where id = '00000000-0000-0000-0000-000000000000';
+
+-- ---------------------------------------------------------------------------
+-- Count reports per day over the last 30 days.
+-- ---------------------------------------------------------------------------
+-- select date_trunc('day', created_at)::date as day, count(*) as reports
+-- from public.reports
+-- where created_at >= now() - interval '30 days'
+-- group by 1
+-- order by 1;
+
+-- ---------------------------------------------------------------------------
+-- Read the audit trail for one report.
+-- ---------------------------------------------------------------------------
+-- select created_at, action, details
+-- from public.admin_audit_log
+-- where entity = 'report'
+--   and entity_id = '00000000-0000-0000-0000-000000000000'
+-- order by created_at desc;

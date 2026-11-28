@@ -21,6 +21,9 @@ to run twice, so re-running a file cannot damage data.
 | 3 | `migrations/20261128_003_events_rls.sql` | Enables RLS and adds every policy, plus grants. |
 | 4 | `migrations/20261128_004_events_triggers.sql` | `updated_at`, the review-field guard, "edited approved event goes back to review", the status timeline, review notifications and participant limits. |
 | 5 | `migrations/20261128_005_events_storage.sql` | The public `event-photos` bucket and the private `event-documents` bucket, with per-user folders and size/mime limits. |
+| 6 | `migrations/20261128_006_report_workflow.sql` | The five-step report workflow (`reported` → `under_verification` → `in_progress` → `fixed` / `cannot_fix`), the review columns on `reports`, the status-history shape and its triggers. |
+| 7 | `migrations/20261128_007_report_confidential.sql` | `reports.is_confidential`, the visibility policies, `public_report_stats()` and the private `issue-photos-confidential` bucket. |
+| 8 | `migrations/20261128_008_admin_audit_exports.sql` | `admin_audit_log`, the trigger that logs status/confidential changes, and the admin-table indexes. |
 
 Optional, not a migration:
 
@@ -28,6 +31,13 @@ Optional, not a migration:
   type. Replace the placeholder organizer id first.
 - `admin/manual_review.sql` — hand-run statements for approving, requesting
   changes, rejecting and promoting an admin, until the admin panel exists.
+- `admin/manual_admin_tasks.sql` — hand-run statements for promoting an admin,
+  listing confidential reports, changing a status with a reason, marking
+  `cannot_fix`, per-day counts and reading the audit trail.
+
+**The app runs before 006–008 are applied.** While those tables/columns are
+missing the admin panel shows a calm "Admin features need a database update"
+notice and falls back to the previous behaviour; public pages keep working.
 
 ## Verify
 
@@ -82,6 +92,54 @@ where id in ('event-photos', 'event-documents');
 select public.is_admin();
 ```
 
+### Verify 006–008
+
+```sql
+-- 006: the review columns exist (expect 7 rows).
+select column_name
+from information_schema.columns
+where table_schema = 'public' and table_name = 'reports'
+  and column_name in (
+    'status_reason', 'status_changed_at', 'status_changed_by',
+    'verified_at', 'verified_by', 'resolved_at', 'official_note'
+  );
+
+-- 006: history carries the from/to shape (expect 4 rows).
+select column_name
+from information_schema.columns
+where table_schema = 'public' and table_name = 'report_status_history'
+  and column_name in ('from_status', 'to_status', 'reason', 'changed_by');
+
+-- 006: the five-value check and the cannot-fix reason check are present.
+select conname from pg_constraint
+where conrelid = 'public.reports'::regclass
+  and conname in ('reports_status_check', 'reports_cannot_fix_reason_check');
+
+-- 006: the two workflow triggers exist (expect 2 rows).
+select trigger_name from information_schema.triggers
+where event_object_table = 'reports'
+  and trigger_name in ('reports_log_status', 'reports_guard_review_fields');
+
+-- 007: confidential column + private bucket (expect is_confidential = true, one row).
+select column_name from information_schema.columns
+where table_schema = 'public' and table_name = 'reports' and column_name = 'is_confidential';
+select id, public, file_size_limit, allowed_mime_types
+from storage.buckets where id = 'issue-photos-confidential';
+
+-- 007: public stats exclude confidential reports.
+select * from public.public_report_stats();
+
+-- 008: audit table + trigger (expect 1 row each).
+select to_regclass('public.admin_audit_log');
+select trigger_name from information_schema.triggers
+where event_object_table = 'reports' and trigger_name = 'reports_audit_changes';
+
+-- Indexes used by the admin table (expect 2 rows).
+select indexname from pg_indexes
+where schemaname = 'public' and tablename = 'reports'
+  and indexname in ('reports_created_at_asc_idx', 'reports_status_created_idx');
+```
+
 ## Roll back
 
 `rollback/events_rollback.sql` drops the triggers, policies, functions, tables
@@ -90,6 +148,13 @@ and buckets created by files 2 to 5, in the right order. It keeps `profiles`,
 
 **It deletes every event, application, participant, notification and stored
 event file.** Read the warning at the top of the file before running it.
+
+`rollback/20261128_006_008_rollback.sql` undoes files 6 to 8 in reverse order:
+it drops the audit table, the confidential column and bucket, the workflow
+triggers and the review columns, and maps statuses back to
+`pending`/`in_progress`/`resolved`. It does **not** delete profiles, reports,
+history, verifications or data. It keeps `profiles.role` and `public.is_admin()`
+(those come from file 1). Read the warning at the top of the file first.
 
 ## Switch the app from local to Supabase
 

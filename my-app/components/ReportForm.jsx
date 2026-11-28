@@ -10,6 +10,7 @@ import {
   Crosshair,
   ImagePlus,
   Info,
+  Lock,
   LogIn,
   MapPin,
   X,
@@ -25,6 +26,7 @@ import {
   reportErrorMessage,
   severityLabel,
   statusLabel,
+  uploadConfidentialReportImage,
   uploadReportImage,
 } from '@/lib/reports'
 import Breadcrumbs from '@/components/Breadcrumbs'
@@ -52,6 +54,7 @@ export default function ReportForm() {
   const [coords, setCoords] = useState(null)
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
+  const [isConfidential, setIsConfidential] = useState(false)
 
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
@@ -170,7 +173,11 @@ export default function ReportForm() {
     try {
       let imageUrl = null
       if (file) {
-        imageUrl = await uploadReportImage(supabase, file, reportId)
+        // A confidential photo goes to the private bucket and is stored as a
+        // path, never a public URL.
+        imageUrl = isConfidential
+          ? await uploadConfidentialReportImage(supabase, file, user.id, reportId)
+          : await uploadReportImage(supabase, file, reportId)
       }
 
       await createReport(supabase, {
@@ -181,14 +188,15 @@ export default function ReportForm() {
         description: description.trim(),
         category,
         severity,
-        status: 'pending',
+        status: 'reported',
         location_name: locationName.trim(),
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
         image_url: imageUrl,
+        is_confidential: isConfidential,
       })
 
-      await addStatusHistory(supabase, reportId, 'pending', 'Report submitted.')
+      await addStatusHistory(supabase, reportId, 'reported', 'Report submitted.')
 
       router.push(`/reports/${reportId}?created=1`)
     } catch (err) {
@@ -472,6 +480,26 @@ export default function ReportForm() {
           )}
         </section>
 
+        <section className="card p-6">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={isConfidential}
+              onChange={(event) => setIsConfidential(event.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[#ff6b5a]"
+            />
+            <span className="min-w-0">
+              <span className="flex items-center gap-2 text-sm font-bold text-ink">
+                <Lock className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
+                {t('Confidential report')}
+              </span>
+              <span className="mt-1 block text-xs text-ink/60">
+                {t('Only you and the authorities can see this. It will not appear on the public map, lists or counts.')}
+              </span>
+            </span>
+          </label>
+        </section>
+
         <div className="card p-6">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">
             <Info className="h-4 w-4 text-ink/40" strokeWidth={2} aria-hidden="true" />
@@ -492,9 +520,11 @@ export default function ReportForm() {
             </div>
           </dl>
           <p className="mt-3 text-xs text-ink/50">
-            {t('New reports start as {status} and appear on the map right away.', {
-              status: statusLabel('pending', lang),
-            })}
+            {isConfidential
+              ? t('This report is confidential. It stays off the public map and counts.')
+              : t('New reports start as {status} and appear on the map right away.', {
+                  status: statusLabel('reported', lang),
+                })}
           </p>
         </div>
 

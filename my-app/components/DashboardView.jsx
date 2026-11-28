@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { AlertCircle, CalendarDays, CircleCheck, Clock, FileText, LoaderCircle, Map, Plus, RotateCw, TrendingUp } from 'lucide-react'
+import { AlertCircle, CalendarDays, CircleCheck, Clock, FileText, LoaderCircle, Map, Plus, RotateCw, ShieldCheck, TrendingUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   ZONE_MIN_REPORTS,
@@ -38,20 +38,27 @@ const RECENT_COUNT = 5
 
 const STAT_CARDS = [
   { key: 'total', label: 'Total reports', href: '/reports', icon: FileText, tone: 'bg-ink/5 text-ink' },
-  { key: 'pending', label: 'Pending', href: '/reports?status=pending', icon: Clock, tone: 'bg-surface text-ink' },
+  { key: 'reported', label: 'Reported', href: '/reports?status=reported', icon: Clock, tone: 'bg-surface text-ink' },
+  {
+    key: 'underVerification',
+    label: 'Under verification',
+    href: '/reports?status=under_verification',
+    icon: ShieldCheck,
+    tone: 'bg-white text-ink ring-1 ring-ink/20',
+  },
   {
     key: 'inProgress',
-    label: 'In progress',
+    label: 'Being resolved',
     href: '/reports?status=in_progress',
     icon: LoaderCircle,
     tone: 'bg-ink text-white',
   },
   {
-    key: 'resolved',
-    label: 'Resolved',
-    href: '/reports?status=resolved',
+    key: 'fixed',
+    label: 'Fixed',
+    href: '/reports?status=fixed',
     icon: CircleCheck,
-    tone: 'bg-accent/15 text-accent',
+    tone: 'bg-white text-ink ring-2 ring-ink',
   },
 ]
 

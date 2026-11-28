@@ -3,7 +3,7 @@
 
 // `./i18n.js` keeps the file runnable by Node (scripts/check-zones.mjs), which
 // does not resolve extensionless specifiers.
-import { localizeField, t } from './i18n.js'
+import { localizeField } from './i18n.js'
 
 export const ITAHARI_CENTER = { lat: 26.6646, lng: 87.2718 }
 
@@ -46,16 +46,33 @@ export function severityLabel(severity, lang = 'en') {
 }
 
 export const STATUS_LABELS_NE = {
-  pending: 'बाँकी',
-  in_progress: 'प्रक्रियामा',
+  reported: 'रिपोर्ट गरिएको',
+  under_verification: 'प्रमाणीकरणमा',
+  in_progress: 'समाधान हुँदै',
+  fixed: 'समाधान भयो',
+  cannot_fix: 'समाधान गर्न नसकिने',
+  // Legacy values, kept so a row that has not been migrated yet still reads.
+  pending: 'रिपोर्ट गरिएको',
   resolved: 'समाधान भयो',
+}
+
+/**
+ * The old three-value vocabulary still lives in reports.status until migration
+ * 006 is applied. Everything reads status through this so both vocabularies map
+ * to the five-step model without special-casing call sites.
+ */
+export function normalizeStatus(status) {
+  if (status === 'pending') return 'reported'
+  if (status === 'resolved') return 'fixed'
+  return status
 }
 
 /** Status name in the reader's language. */
 export function statusLabel(status, lang = 'en') {
-  const fallback = STATUS_CONFIG[status]?.label ?? status
+  const key = normalizeStatus(status)
+  const fallback = STATUS_CONFIG[key]?.label ?? status
   if (lang !== 'ne') return fallback
-  return STATUS_LABELS_NE[status] ?? fallback
+  return STATUS_LABELS_NE[key] ?? STATUS_LABELS_NE[status] ?? fallback
 }
 
 // Every badge uses only the four palette colours: ink #0b4a6f, accent #ff6b5a,
@@ -92,26 +109,62 @@ export const SEVERITY_CONFIG = {
   },
 }
 
+// Palette only, and distinct by fill *and* icon so colour is never the only
+// signal. Icons are chosen in components/Badges.jsx and StatusBadge.
 export const STATUS_CONFIG = {
-  pending: {
-    label: 'Pending',
-    badge: 'bg-surface text-ink border-ink/30',
+  reported: {
+    label: 'Reported',
+    badge: 'bg-surface text-ink border-ink/20',
     dot: 'bg-ink',
+    order: 1,
   },
-  in_progress: {
-    label: 'In Progress',
-    badge: 'bg-ink text-white border-ink',
-    dot: 'bg-ink',
-  },
-  resolved: {
-    label: 'Resolved',
+  under_verification: {
+    label: 'Under verification',
     badge: 'bg-white text-ink border-ink',
     dot: 'bg-ink',
+    order: 2,
+  },
+  in_progress: {
+    label: 'Being resolved',
+    badge: 'bg-ink text-white border-ink',
+    dot: 'bg-white',
+    order: 3,
+  },
+  fixed: {
+    label: 'Fixed',
+    badge: 'bg-white text-ink border-ink border-2 font-bold',
+    dot: 'bg-ink',
+    order: 4,
+    terminal: true,
+  },
+  cannot_fix: {
+    label: "Can't be fixed",
+    badge: 'bg-accent text-white border-accent',
+    dot: 'bg-white',
+    order: 4,
+    terminal: true,
   },
 }
 
 export const SEVERITY_ORDER = Object.keys(SEVERITY_CONFIG)
-export const STATUS_ORDER = Object.keys(STATUS_CONFIG)
+
+// The linear steps the stepper walks; cannot_fix is the alternate terminal.
+export const STATUS_ORDER = ['reported', 'under_verification', 'in_progress', 'fixed']
+export const STATUS_TERMINAL_ALT = 'cannot_fix'
+export const ALL_STATUSES = [...STATUS_ORDER, STATUS_TERMINAL_ALT]
+
+/** The status that follows `status`, or null at a terminal step. */
+export function nextStatus(status) {
+  const key = normalizeStatus(status)
+  const index = STATUS_ORDER.indexOf(key)
+  if (index === -1) return 'under_verification'
+  return STATUS_ORDER[index + 1] ?? null
+}
+
+export function isTerminalStatus(status) {
+  const key = normalizeStatus(status)
+  return key === 'fixed' || key === 'cannot_fix'
+}
 
 export const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest first' },
@@ -160,7 +213,7 @@ export function normalizeReport(row, verifiedIds) {
     description_ne: row.description_ne ?? '',
     category: row.category,
     severity: row.severity,
-    status: row.status,
+    status: normalizeStatus(row.status),
     locationName: row.location_name ?? '',
     // Both hold the SQL `_ne` suffix so localizeField() reads the same field name
     // whatever the backend (see lib/i18n.js). Empty until the bilingual migration
@@ -169,6 +222,14 @@ export function normalizeReport(row, verifiedIds) {
     latitude: row.latitude,
     longitude: row.longitude,
     imageUrl: row.image_url || null,
+    // Optional columns from migration 007; absent (undefined) until it is run.
+    isConfidential: row.is_confidential === true,
+    // Optional review columns from migration 006.
+    statusReason: row.status_reason ?? '',
+    officialNote: row.official_note ?? '',
+    statusChangedAt: row.status_changed_at ?? null,
+    verifiedAt: row.verified_at ?? null,
+    resolvedAt: row.resolved_at ?? null,
     reporterName: row.reporter_name || 'Anonymous',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -176,6 +237,29 @@ export function normalizeReport(row, verifiedIds) {
     verifiedByMe: verifiedIds ? verifiedIds.has(row.id) : false,
   }
 }
+
+// Preset reasons offered when an admin marks a report cannot_fix. Stored as the
+// free text the constraint checks, so the catalogue lives here only.
+export const CANNOT_FIX_REASONS = [
+  'Private property',
+  'Outside municipal jurisdiction',
+  'Needs major budget',
+  'Duplicate report',
+  'Cannot be located',
+  'Other',
+]
+
+/**
+ * True when an error means migration 006–008 has not been applied yet
+ * (missing column, missing table, or a PostgREST "not found in schema").
+ */
+export function isDbUpdateError(error) {
+  const code = error?.code
+  return code === '42703' || code === '42P01' || code === 'PGRST205'
+}
+
+/** The calm notice shown when admin features need the new SQL. */
+export const DB_UPDATE_NOTICE = 'Admin features need a database update.'
 
 export function hasCoords(report) {
   return (
@@ -366,61 +450,95 @@ export async function fetchReports(
   supabase,
   { search, category, status, severity, sort = 'newest', page = 1 } = {}
 ) {
-  let query = supabase.from('reports').select(REPORT_SELECT, { count: 'exact' })
+  const build = (publicOnly) => {
+    let query = supabase.from('reports').select(REPORT_SELECT, { count: 'exact' })
+    // Second layer under RLS: public lists never include confidential reports.
+    if (publicOnly) query = query.eq('is_confidential', false)
 
-  const term = search ? sanitizeSearchTerm(search) : ''
-  if (term) {
-    query = query.or(
-      `title.ilike.%${term}%,description.ilike.%${term}%,location_name.ilike.%${term}%`
-    )
+    const term = search ? sanitizeSearchTerm(search) : ''
+    if (term) {
+      query = query.or(
+        `title.ilike.%${term}%,description.ilike.%${term}%,location_name.ilike.%${term}%`
+      )
+    }
+    if (category && category !== 'All') query = query.eq('category', category)
+    if (status && status !== 'all') query = query.in('status', statusAliasList(status))
+    if (severity && severity !== 'all') query = query.eq('severity', severity)
+
+    if (sort === 'oldest') {
+      query = query.order('created_at', { ascending: true })
+    } else if (sort === 'severity') {
+      query = query.order('severity', { ascending: false }).order('created_at', { ascending: false })
+    } else {
+      query = query.order('created_at', { ascending: false })
+    }
+
+    const from = (page - 1) * PAGE_SIZE
+    return query.range(from, from + PAGE_SIZE - 1)
   }
-  if (category && category !== 'All') query = query.eq('category', category)
-  if (status && status !== 'all') query = query.eq('status', status)
-  if (severity && severity !== 'all') query = query.eq('severity', severity)
 
-  if (sort === 'oldest') {
-    query = query.order('created_at', { ascending: true })
-  } else if (sort === 'severity') {
-    query = query.order('severity', { ascending: false }).order('created_at', { ascending: false })
-  } else {
-    query = query.order('created_at', { ascending: false })
-  }
-
-  const from = (page - 1) * PAGE_SIZE
-  const { data, error, count } = await query.range(from, from + PAGE_SIZE - 1)
+  let { data, error, count } = await build(true)
+  if (error && isDbUpdateError(error)) ({ data, error, count } = await build(false))
   if (error) throw error
 
   return { rows: data ?? [], count: count ?? 0 }
 }
 
+// A status filter matches both vocabularies while the migration rolls out.
+function statusAliasList(status) {
+  if (status === 'reported') return ['reported', 'pending']
+  if (status === 'fixed') return ['fixed', 'resolved']
+  return [status]
+}
+
 export async function fetchMapReports(supabase) {
-  const { data, error } = await supabase
-    .from('reports')
-    .select(REPORT_SELECT)
-    .order('created_at', { ascending: false })
-    .limit(500)
+  const build = (publicOnly) => {
+    let query = supabase
+      .from('reports')
+      .select(REPORT_SELECT)
+      .order('created_at', { ascending: false })
+      .limit(500)
+    if (publicOnly) query = query.eq('is_confidential', false)
+    return query
+  }
+
+  let { data, error } = await build(true)
+  if (error && isDbUpdateError(error)) ({ data, error } = await build(false))
   if (error) throw error
   return data ?? []
 }
 
 export async function fetchReportStats(supabase) {
   const head = () => supabase.from('reports').select('id', { count: 'exact', head: true })
-  const [total, pending, inProgress, resolved, categories] = await Promise.all([
-    head(),
-    head().eq('status', 'pending'),
-    head().eq('status', 'in_progress'),
-    head().eq('status', 'resolved'),
-    supabase.from('report_category_counts').select('category,count'),
-  ])
+  // `.in` with both vocabularies keeps the count right before and after the
+  // workflow migration; a status that does not exist simply matches nothing.
+  const countFor = (statuses) => head().in('status', statuses)
 
-  const error = total.error || pending.error || inProgress.error || resolved.error
+  const [total, reported, underVerification, inProgress, fixed, cannotFix, categories] =
+    await Promise.all([
+      head(),
+      countFor(['reported', 'pending']),
+      countFor(['under_verification']),
+      countFor(['in_progress']),
+      countFor(['fixed', 'resolved']),
+      countFor(['cannot_fix']),
+      supabase.from('report_category_counts').select('category,count'),
+    ])
+
+  const error =
+    total.error || reported.error || underVerification.error || inProgress.error || fixed.error
   if (error) throw error
 
   return {
     total: total.count ?? 0,
-    pending: pending.count ?? 0,
+    reported: reported.count ?? 0,
+    underVerification: underVerification.count ?? 0,
     inProgress: inProgress.count ?? 0,
-    resolved: resolved.count ?? 0,
+    fixed: fixed.count ?? 0,
+    cannotFix: cannotFix.count ?? 0,
+    // Legacy aliases so older call sites keep reading a number.
+    pending: reported.count ?? 0,
+    resolved: fixed.count ?? 0,
     categories: categories.data ?? [],
   }
 }
@@ -435,14 +553,43 @@ export async function fetchReport(supabase, id) {
 
   if (!data) return { row: null, history: [] }
 
+  // `*` so the read survives whether or not 006 has added from_status/to_status.
   const { data: history, error: historyError } = await supabase
     .from('report_status_history')
-    .select('id,status,note,created_at')
+    .select('*')
     .eq('report_id', id)
     .order('created_at', { ascending: true })
   if (historyError) throw historyError
 
   return { row: data, history: history ?? [] }
+}
+
+/**
+ * History rows with the admin name attached, read by the review page and the
+ * detail stepper. Tolerates the pre-006 shape.
+ */
+export async function fetchReportHistory(supabase, reportId) {
+  const { data, error } = await supabase
+    .from('report_status_history')
+    .select('*')
+    .eq('report_id', reportId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+
+  const rows = data ?? []
+  const changedByIds = [...new Set(rows.map((row) => row.changed_by).filter(Boolean))]
+  const profiles = changedByIds.length ? await fetchProfilesByIds(supabase, changedByIds) : new Map()
+
+  return rows.map((row) => ({
+    id: row.id,
+    fromStatus: normalizeStatus(row.from_status ?? null),
+    toStatus: normalizeStatus(row.to_status ?? row.status),
+    reason: row.reason ?? '',
+    note: row.note ?? '',
+    changedById: row.changed_by ?? null,
+    changedByName: row.changed_by ? profiles.get(row.changed_by)?.full_name || '' : '',
+    createdAt: row.created_at,
+  }))
 }
 
 /** Reports the given user created, newest first, for the profile page. */
@@ -543,29 +690,61 @@ export async function fetchAdminAnalytics(supabase) {
 // ---------------------------------------------------------------------------
 
 export async function createReport(supabase, payload) {
-  const { data, error } = await supabase
-    .from('reports')
-    .insert(payload)
-    .select('id')
-    .single()
+  const insert = (values) => supabase.from('reports').insert(values).select('id').single()
+
+  let { data, error } = await insert(payload)
+  // is_confidential only exists after migration 007.
+  if (error && isDbUpdateError(error)) {
+    const { is_confidential, ...rest } = payload
+    ;({ data, error } = await insert(rest))
+  }
+  // Before migration 006 the status column is the old enum; 'reported' fails, so
+  // fall back to 'pending'.
+  if (error && (error.code === '22P02' || error.code === '23514')) {
+    ;({ data, error } = await insert({ ...payload, status: 'pending' }))
+  }
   if (error) throw error
   return data.id
 }
 
 export async function addStatusHistory(supabase, reportId, status, note) {
-  const { error } = await supabase
-    .from('report_status_history')
-    .insert({ report_id: reportId, status, note: note || null })
+  const insert = (value) =>
+    supabase.from('report_status_history').insert({ report_id: reportId, status: value, note: note || null })
+  let { error } = await insert(status)
+  if (error && error.code === '22P02') {
+    ;({ error } = await insert(status === 'reported' ? 'pending' : status))
+  }
   if (error) throw error
 }
 
-export async function updateReportStatus(supabase, reportId, status, note) {
+/**
+ * Move a report to a new status. The 006 trigger writes the history row, so the
+ * app does not insert one here (that would duplicate it). `reason` is required by
+ * the database for cannot_fix and for backward moves; `officialNote` is the public
+ * note shown on the report page.
+ *
+ * The review columns only exist after migration 006, so a missing-column error
+ * retries with just the status.
+ */
+export async function updateReportStatus(supabase, reportId, status, { reason, officialNote } = {}) {
+  const full = { status }
+  if (reason) full.status_reason = reason
+  if (officialNote) full.official_note = officialNote
+
+  let { error } = await supabase.from('reports').update(full).eq('id', reportId)
+  if (error && isDbUpdateError(error)) {
+    ;({ error } = await supabase.from('reports').update({ status }).eq('id', reportId))
+  }
+  if (error) throw error
+}
+
+/** Flip the confidential flag (owner while reported, admins always — via RLS). */
+export async function setReportConfidential(supabase, reportId, isConfidential) {
   const { error } = await supabase
     .from('reports')
-    .update({ status })
+    .update({ is_confidential: isConfidential })
     .eq('id', reportId)
   if (error) throw error
-  await addStatusHistory(supabase, reportId, status, note)
 }
 
 /** Permanently delete a report (restricted to admins via RLS). */
@@ -619,6 +798,34 @@ export async function uploadReportImage(supabase, file, reportId) {
   return data.publicUrl
 }
 
+/**
+ * Upload a confidential report photo into the private bucket and return its
+ * storage *path* — never a public URL. Render it with signedImageUrl().
+ */
+export async function uploadConfidentialReportImage(supabase, file, userId, reportId) {
+  if (!file.type.startsWith('image/')) throw new Error('Please choose an image file.')
+  if (file.size > MAX_IMAGE_BYTES) throw new Error('Images must be 5 MB or smaller.')
+  const ext = fileExtension(file, 'jpg')
+  const path = `${userId}/${reportId}/${Date.now()}.${ext || 'jpg'}`
+
+  const { error } = await supabase.storage
+    .from('issue-photos-confidential')
+    .upload(path, file, { cacheControl: '3600', upsert: false })
+  if (error) throw error
+
+  return path
+}
+
+/** A 60-minute signed URL for a confidential photo (owner and admins only). */
+export async function signedImageUrl(supabase, path, expiresIn = 3600) {
+  if (!path) return ''
+  const { data, error } = await supabase.storage
+    .from('issue-photos-confidential')
+    .createSignedUrl(path, expiresIn)
+  if (error) throw error
+  return data?.signedUrl ?? ''
+}
+
 /** Upload an avatar into the public "avatars" bucket and return its URL. */
 export async function uploadAvatar(supabase, file, userId) {
   if (!file.type.startsWith('image/')) {
@@ -643,44 +850,10 @@ export async function uploadAvatar(supabase, file, userId) {
 // Formatting
 // ---------------------------------------------------------------------------
 
-export function formatDate(value, lang = 'en') {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString(lang === 'ne' ? 'ne-NP' : undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-export function formatDateTime(value, lang = 'en') {
-  if (!value) return '—'
-  return new Date(value).toLocaleString(lang === 'ne' ? 'ne-NP' : undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
-/** "Just now", "5 min ago" … in the reader's language. */
-export function timeAgo(value, lang = 'en') {
-  if (!value) return '—'
-  const then = new Date(value).getTime()
-  if (Number.isNaN(then)) return '—'
-  const seconds = Math.round((Date.now() - then) / 1000)
-
-  if (seconds < 60) return t(lang, 'Just now')
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return t(lang, '{n} min ago', { n: minutes })
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) {
-    return t(lang, hours === 1 ? '{n} hour ago' : '{n} hours ago', { n: hours })
-  }
-  const days = Math.round(hours / 24)
-  if (days < 7) return t(lang, days === 1 ? '{n} day ago' : '{n} days ago', { n: days })
-  return formatDate(value, lang)
-}
+// Dates, times and relative tags live in lib/format.js so every screen shows
+// Nepal time (Asia/Kathmandu) with date + hour + minute, and Devanagari digits in
+// Nepali. Re-exported here because callers already import them from ./reports.
+export { formatDate, formatDateTime, timeAgo } from './format.js'
 
 export function shortId(id) {
   return id ? id.slice(0, 8).toUpperCase() : '—'

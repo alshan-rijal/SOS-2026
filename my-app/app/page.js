@@ -68,11 +68,35 @@ async function loadVerifiedReports(supabase) {
 async function loadCommunityProof() {
   try {
     const supabase = await createClient()
-    const countOf = () => supabase.from('reports').select('id', { count: 'exact', head: true })
 
-    const [submitted, resolved, verifications, contributors, resolvedRows] = await Promise.all([
+    // Public counts never include confidential reports. The filter is added on
+    // top of RLS, and dropped only if migration 007 is not applied yet (42703).
+    const countOf = (apply) => {
+      const build = (publicOnly) => {
+        let query = supabase.from('reports').select('id', { count: 'exact', head: true })
+        if (publicOnly) query = query.eq('is_confidential', false)
+        if (apply) query = apply(query)
+        return query
+      }
+      return build(true).then((result) =>
+        result.error?.code === '42703' ? build(false) : result
+      )
+    }
+
+    const resolvedRowsQuery = (publicOnly) => {
+      let query = supabase
+        .from('reports')
+        .select(RECENT_SELECT)
+        .in('status', ['fixed', 'resolved'])
+        .order('updated_at', { ascending: false })
+        .limit(3)
+      if (publicOnly) query = query.eq('is_confidential', false)
+      return query
+    }
+
+    const [submitted, resolved, verifications, contributors, resolvedFirst] = await Promise.all([
       countOf(),
-      countOf().eq('status', 'resolved'),
+      countOf((query) => query.in('status', ['fixed', 'resolved'])),
       supabase.from('report_verifications').select('report_id', { count: 'exact', head: true }),
       // shortcut: contributors = distinct reporter ids over the newest 1000
       // reports; move to a SQL view if the table grows past that.
@@ -81,13 +105,9 @@ async function loadCommunityProof() {
         .select('user_id')
         .not('user_id', 'is', null)
         .limit(1000),
-      supabase
-        .from('reports')
-        .select(RECENT_SELECT)
-        .eq('status', 'resolved')
-        .order('updated_at', { ascending: false })
-        .limit(3),
+      resolvedRowsQuery(true),
     ])
+    const resolvedRows = resolvedFirst.error?.code === '42703' ? await resolvedRowsQuery(false) : resolvedFirst
 
     if (
       submitted.error ||

@@ -9,20 +9,20 @@ import {
   ArrowLeft,
   CalendarClock,
   CircleCheck,
+  CircleX,
   Clock,
   ExternalLink,
   FileQuestion,
   History,
   LoaderCircle,
   MapPin,
-  Pencil,
   RefreshCw,
+  ShieldCheck,
   ThumbsUp,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   STATUS_CONFIG,
-  STATUS_ORDER,
   categoryLabel,
   fetchMyVerifiedIds,
   fetchProfile,
@@ -32,14 +32,15 @@ import {
   formatDateTime,
   hasCoords,
   normalizeReport,
+  normalizeStatus,
   reportErrorMessage,
   setVerification,
   shortId,
   statusLabel,
   timeAgo,
-  updateReportStatus,
 } from '@/lib/reports'
 import { SeverityBadge, StatusBadge } from '@/components/Badges'
+import StatusStepper from '@/components/StatusStepper'
 import ReportImage from '@/components/ReportImage'
 import Avatar from '@/components/Avatar'
 import EmptyState from '@/components/EmptyState'
@@ -52,9 +53,11 @@ const ItahariMap = dynamic(() => import('@/components/ItahariMap'), {
 })
 
 const STATUS_ICONS = {
-  pending: Clock,
+  reported: Clock,
+  under_verification: ShieldCheck,
   in_progress: LoaderCircle,
-  resolved: CircleCheck,
+  fixed: CircleCheck,
+  cannot_fix: CircleX,
 }
 
 function SectionCard({ title, icon: Icon, children, action }) {
@@ -107,9 +110,7 @@ export default function ReportDetail() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isVerifying, setIsVerifying] = useState(false)
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
-  const [nextStatus, setNextStatus] = useState('pending')
-  const [statusNote, setStatusNote] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -123,6 +124,16 @@ export default function ReportDetail() {
 
       setUser(current ?? null)
       setHistory(entries)
+      if (current) {
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', current.id)
+          .maybeSingle()
+        setIsAdmin(profileRow?.role === 'admin')
+      } else {
+        setIsAdmin(false)
+      }
 
       if (!row) {
         setReport(null)
@@ -135,7 +146,6 @@ export default function ReportDetail() {
 
       const normalized = normalizeReport(row, verifiedIds)
       setReport(normalized)
-      setNextStatus(row.status)
 
       // Secondary context fills the shorter column so no card sits alone in space.
       const [profile, people, nearby] = await Promise.all([
@@ -194,22 +204,6 @@ export default function ReportDetail() {
       setError(reportErrorMessage(err))
     } finally {
       setIsVerifying(false)
-    }
-  }
-
-  async function handleStatusUpdate(event) {
-    event.preventDefault()
-    if (!report || nextStatus === report.status) return
-
-    setIsUpdatingStatus(true)
-    try {
-      await updateReportStatus(supabase, report.id, nextStatus, statusNote.trim())
-      setStatusNote('')
-      await load()
-    } catch (err) {
-      setError(reportErrorMessage(err))
-    } finally {
-      setIsUpdatingStatus(false)
     }
   }
 
@@ -326,7 +320,25 @@ export default function ReportDetail() {
             <StatusBadge status={report.status} />
           </div>
         </div>
+
+        <StatusStepper
+          className="mt-5 border-t border-ink/10 pt-5"
+          status={report.status}
+          reason={report.statusReason}
+          history={history.map((entry) => ({
+            id: entry.id,
+            toStatus: normalizeStatus(entry.to_status ?? entry.status),
+            createdAt: entry.created_at,
+          }))}
+        />
       </section>
+
+      {report.officialNote ? (
+        <div className="rounded-xl border border-ink/12 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink/55">{t('Official note')}</p>
+          <p className="mt-1 text-sm text-ink/80">{report.officialNote}</p>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm font-medium text-ink">
@@ -359,6 +371,7 @@ export default function ReportDetail() {
               <ReportImage
                 src={report.imageUrl}
                 alt={t('Photo for: {title}', { title: report.title })}
+                confidential={report.isConfidential}
               />
             </SectionCard>
           ) : null}
@@ -369,14 +382,15 @@ export default function ReportDetail() {
             ) : (
               <ol className="relative space-y-5 border-l border-ink/10 pl-5">
                 {history.map((entry) => {
-                  const config = STATUS_CONFIG[entry.status] ?? STATUS_CONFIG.pending
-                  const Icon = STATUS_ICONS[entry.status] ?? Clock
+                  const key = normalizeStatus(entry.status)
+                  const config = STATUS_CONFIG[key] ?? STATUS_CONFIG.reported
+                  const Icon = STATUS_ICONS[key] ?? Clock
                   return (
                     <li key={entry.id} className="relative">
                       <span className={`absolute -left-[1.875rem] flex h-5 w-5 items-center justify-center rounded-full border ring-4 ring-white ${config.badge}`}>
                         <Icon className="h-3 w-3" strokeWidth={2.4} aria-hidden="true" />
                       </span>
-                      <p className="text-sm font-semibold text-ink">{statusLabel(entry.status, lang)}</p>
+                      <p className="text-sm font-semibold text-ink">{statusLabel(key, lang)}</p>
                       {entry.note ? <p className="mt-0.5 text-sm text-ink/70">{entry.note}</p> : null}
                       <p className="mt-0.5 text-xs text-ink/50">{formatDateTime(entry.created_at, lang)}</p>
                     </li>
@@ -465,48 +479,18 @@ export default function ReportDetail() {
               </p>
             ) : null}
 
-            {isOwner ? (
-              <form onSubmit={handleStatusUpdate} className="mt-5 border-t border-ink/10 pt-5">
-                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink/60">
-                  <Pencil className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
-                  {t('Update status')}
-                </h3>
-                <div className="mt-3 space-y-2.5">
-                  <label className="sr-only" htmlFor="next-status">
-                    {t('New status')}
-                  </label>
-                  <select
-                    id="next-status"
-                    value={nextStatus}
-                    onChange={(event) => setNextStatus(event.target.value)}
-                    className="w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  >
-                    {STATUS_ORDER.map((key) => (
-                      <option key={key} value={key}>
-                        {statusLabel(key, lang)}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="sr-only" htmlFor="status-note">
-                    {t('Note')}
-                  </label>
-                  <input
-                    id="status-note"
-                    type="text"
-                    value={statusNote}
-                    onChange={(event) => setStatusNote(event.target.value)}
-                    placeholder={t('Add a note (optional)')}
-                    className="w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isUpdatingStatus || nextStatus === report.status}
-                    className="w-full rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isUpdatingStatus ? t('Updating…') : t('Save status')}
-                  </button>
-                </div>
-              </form>
+            <p className="mt-5 rounded-lg bg-surface px-3 py-2.5 text-center text-xs font-medium text-ink/70">
+              {t('Status updates are made by the authorities.')}
+            </p>
+
+            {isAdmin ? (
+              <Link
+                href={`/admin/reports/${report.id}`}
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-ink bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors duration-150 hover:bg-surface"
+              >
+                <ShieldCheck className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
+                {t('Open in admin')}
+              </Link>
             ) : null}
           </SectionCard>
 

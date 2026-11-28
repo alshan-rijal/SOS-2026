@@ -1,30 +1,15 @@
 'use client'
 
-import { CircleCheck, Clock, LoaderCircle } from 'lucide-react'
-import { SEVERITY_CONFIG, STATUS_CONFIG, severityLabel, statusLabel } from '@/lib/reports'
+import { SEVERITY_CONFIG, severityLabel } from '@/lib/reports'
 import { eventStatusMeta } from '@/lib/events'
 import { useLanguage } from '@/components/LanguageContext'
 
-const STATUS_ICONS = {
-  pending: Clock,
-  in_progress: LoaderCircle,
-  resolved: CircleCheck,
-}
+// StatusBadge moved to its own component (components/StatusBadge.jsx); it is
+// re-exported here so existing `@/components/Badges` imports keep working.
+export { default as StatusBadge } from '@/components/StatusBadge'
 
 // One pill shape for every badge: same height, radius and font size.
 const BADGE = 'inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold'
-
-export function StatusBadge({ status, className = '' }) {
-  const { lang } = useLanguage()
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending
-  const Icon = STATUS_ICONS[status] ?? Clock
-  return (
-    <span className={`${BADGE} ${cfg.badge} ${className}`}>
-      <Icon className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
-      {statusLabel(status, lang)}
-    </span>
-  )
-}
 
 export function SeverityBadge({ severity, className = '' }) {
   const { lang } = useLanguage()
