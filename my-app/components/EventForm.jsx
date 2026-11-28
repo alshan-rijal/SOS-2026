@@ -109,21 +109,27 @@ const EMPTY_FORM = {
   contactEmail: '',
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+function localTodayISO() {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-function fileExt(file) {
-  return (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '')
+function fileExt(file, fallback = 'jpg') {
+  const raw = (file.name.split('.').pop() || fallback).toLowerCase().replace(/[^a-z0-9]/g, '')
+  return raw || fallback
 }
 
 export default function EventForm() {
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const editId = searchParams.get('edit')
   const { t } = useLanguage()
 
   const [user, setUser] = useState(undefined) // undefined = loading, null = signed out
+  const [todayDate, setTodayDate] = useState('')
   const [step, setStep] = useState(1)
   const [form, setForm] = useState(EMPTY_FORM)
   const [answers, setAnswers] = useState({})
@@ -131,13 +137,33 @@ export default function EventForm() {
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [confirm, setConfirm] = useState(false)
+
   const [coverFile, setCoverFile] = useState(null)
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState(null)
   const [docFile, setDocFile] = useState(null)
+  const [existingDocPaths, setExistingDocPaths] = useState([])
+
   const [draftSavedAt, setDraftSavedAt] = useState(null)
   const [submitted, setSubmitted] = useState(false)
   const [isLoadingEdit, setIsLoadingEdit] = useState(Boolean(editId))
   const coverInputRef = useRef(null)
+  const docInputRef = useRef(null)
   const draftKey = editId ? `${DRAFT_KEY}:${editId}` : DRAFT_KEY
+
+  useEffect(() => {
+    setTodayDate(localTodayISO())
+  }, [])
+
+  // Revoke local object URL when coverFile changes or component unmounts
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreviewUrl(null)
+      return
+    }
+    const objectUrl = URL.createObjectURL(coverFile)
+    setCoverPreviewUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [coverFile])
 
   const set = (key, value) => {
     setForm((previous) => ({ ...previous, [key]: value }))
@@ -152,13 +178,25 @@ export default function EventForm() {
       .getUser()
       .then(({ data }) => {
         if (!active) return
-        setUser(data?.user ?? null)
+        const currentUser = data?.user ?? null
+        setUser(currentUser)
+        if (currentUser && !editId) {
+          setForm((prev) => ({
+            ...prev,
+            contactEmail: prev.contactEmail || currentUser.email || '',
+            contactName:
+              prev.contactName ||
+              currentUser.user_metadata?.full_name ||
+              currentUser.user_metadata?.name ||
+              '',
+          }))
+        }
       })
       .catch(() => active && setUser(null))
     return () => {
       active = false
     }
-  }, [supabase])
+  }, [supabase, editId])
 
   // --- edit mode: prefill from the existing application --------------------
   useEffect(() => {
@@ -192,8 +230,11 @@ export default function EventForm() {
           contactEmail: event.contactEmail,
         })
         setAnswers(event.answers ?? {})
+        setExistingDocPaths(Array.isArray(event.documentPaths) ? event.documentPaths : [])
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (active) setFormError(eventsErrorMessage(err))
+      })
       .finally(() => active && setIsLoadingEdit(false))
     return () => {
       active = false
@@ -231,7 +272,7 @@ export default function EventForm() {
         if (!raw) return
         const parsed = JSON.parse(raw)
         if (parsed?.form?.type) {
-          setForm({ ...EMPTY_FORM, ...parsed.form })
+          setForm((prev) => ({ ...EMPTY_FORM, ...prev, ...parsed.form }))
           setAnswers(parsed.answers ?? {})
           if (typeof parsed.step === 'number') setStep(parsed.step)
         }
@@ -242,8 +283,18 @@ export default function EventForm() {
 
   const typeQuestions = TYPE_QUESTIONS[form.type] ?? []
 
+  const questionLabelByKey = useMemo(() => {
+    const map = new Map()
+    for (const q of [...GENERAL_QUESTIONS, ...typeQuestions]) {
+      map.set(q.key, q.label)
+    }
+    return map
+  }, [typeQuestions])
+
   function validateStep(current) {
     const next = {}
+    const minDate = todayDate || localTodayISO()
+
     if (current === 1 && !form.type) next.type = t('Choose an event type.')
     if (current === 2) {
       if (!form.title.trim()) next.title = t('Give the event a title.')
@@ -253,10 +304,12 @@ export default function EventForm() {
         })
       }
       if (!form.eventDate) next.eventDate = t('Pick a date.')
-      else if (form.eventDate < todayISO()) next.eventDate = t('Choose today or a future date.')
+      else if (form.eventDate < minDate) next.eventDate = t('Choose today or a future date.')
       if (!form.startTime) next.startTime = t('Add a start time.')
       if (!form.endTime) next.endTime = t('Add an end time.')
-      else if (form.startTime && form.endTime <= form.startTime) next.endTime = t('End time must be after the start.')
+      else if (form.startTime && form.endTime <= form.startTime) {
+        next.endTime = t('End time must be after the start.')
+      }
       if (form.maxParticipants && Number(form.maxParticipants) <= 0) {
         next.maxParticipants = t('Enter a positive number.')
       }
@@ -307,7 +360,6 @@ export default function EventForm() {
       setCoverFile(file)
       set('coverUrl', null)
     } else {
-      // Local mode keeps the picture as a data URL in this browser.
       const reader = new FileReader()
       reader.onload = () => set('coverUrl', String(reader.result))
       reader.readAsDataURL(file)
@@ -331,34 +383,45 @@ export default function EventForm() {
   }
 
   async function uploadCover(file) {
-    const ext = fileExt(file)
+    const ext = fileExt(file, 'jpg')
     const path = `${user.id}/${Date.now()}.${ext}`
     const { error } = await supabase.storage
       .from('event-photos')
-      .upload(path, file, { cacheControl: '3600', upsert: false })
+      .upload(path, file, {
+        cacheControl: '3600',
+        contentType: file.type,
+        upsert: false,
+      })
     if (error) throw error
     return supabase.storage.from('event-photos').getPublicUrl(path).data.publicUrl
   }
 
   async function uploadDocument(file) {
-    const ext = fileExt(file)
+    const ext = fileExt(file, 'pdf')
     const path = `${user.id}/${Date.now()}.${ext}`
     const { error } = await supabase.storage
       .from('event-documents')
-      .upload(path, file, { cacheControl: '3600', upsert: false })
+      .upload(path, file, {
+        cacheControl: '3600',
+        contentType: file.type,
+        upsert: false,
+      })
     if (error) throw error
     return path
   }
 
   async function handleSubmit(submitEvent) {
     submitEvent.preventDefault()
-    if (!validateStep(5) || !user) return
+    if (!validateStep(5) || !user || isSubmitting) return
 
     setIsSubmitting(true)
     setFormError('')
     try {
       const coverUrl = coverFile ? await uploadCover(coverFile) : form.coverUrl
-      const documentPaths = docFile ? [await uploadDocument(docFile)] : []
+      const uploadedPath = docFile ? await uploadDocument(docFile) : null
+      const documentPaths = uploadedPath
+        ? [...existingDocPaths, uploadedPath]
+        : existingDocPaths
 
       const payload = {
         type: form.type,
@@ -393,6 +456,9 @@ export default function EventForm() {
       setSubmitted(true)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Event Upload Error]', err)
+      }
       setFormError(eventsErrorMessage(err))
       setIsSubmitting(false)
     }
@@ -404,13 +470,23 @@ export default function EventForm() {
       { label: t('Type'), value: form.type ? t(meta.label) : t('Not chosen') },
       { label: t('Title'), value: form.title.trim() || t('Not set') },
       { label: t('Date'), value: form.eventDate || t('Not set') },
-      { label: t('Time'), value: form.startTime && form.endTime ? `${form.startTime} – ${form.endTime}` : t('Not set') },
+      {
+        label: t('Time'),
+        value: form.startTime && form.endTime ? `${form.startTime} – ${form.endTime}` : t('Not set'),
+      },
       { label: t('Place'), value: form.address.trim() || t('Not set') },
       { label: t('Participants'), value: form.maxParticipants || t('No limit') },
     ]
     if (form.title_ne.trim()) rows.push({ label: t('Title in Nepali'), value: form.title_ne.trim() })
+    if (coverFile || form.coverUrl) {
+      rows.push({ label: t('Cover photo'), value: coverFile ? coverFile.name : t('Attached') })
+    }
+    const totalDocs = existingDocPaths.length + (docFile ? 1 : 0)
+    if (totalDocs > 0) {
+      rows.push({ label: t('Supporting documents'), value: `${totalDocs}` })
+    }
     return rows
-  }, [form, t])
+  }, [form, coverFile, docFile, existingDocPaths.length, t])
 
   if (user === undefined || isLoadingEdit) {
     return (
@@ -424,20 +500,34 @@ export default function EventForm() {
   if (user === null) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <Breadcrumbs items={[{ label: t('Dashboard'), href: '/dashboard' }, { label: t('Events'), href: '/events' }, { label: t('Organise') }]} />
+        <Breadcrumbs
+          items={[
+            { label: t('Dashboard'), href: '/dashboard' },
+            { label: t('Events'), href: '/events' },
+            { label: t('Organise') },
+          ]}
+        />
         <div className="card p-6 text-center">
           <span className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-ink/5 text-ink/60">
             <LogIn className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
           </span>
           <h1 className="text-lg font-semibold text-ink">{t('Sign in to organise an event')}</h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-ink/60">
-            {t('Anyone can browse events. An account lets you submit an application and track the review decision under My events.')}
+            {t(
+              'Anyone can browse events. An account lets you submit an application and track the review decision under My events.'
+            )}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/login?next=/events/new" className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90">
+            <Link
+              href="/login?next=/events/new"
+              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
+            >
               {t('Log in')}
             </Link>
-            <Link href="/register" className="rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5">
+            <Link
+              href="/register"
+              className="rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5"
+            >
               {t('Create account')}
             </Link>
           </div>
@@ -449,7 +539,13 @@ export default function EventForm() {
   if (submitted) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
-        <Breadcrumbs items={[{ label: t('Dashboard'), href: '/dashboard' }, { label: t('Events'), href: '/events' }, { label: t('Organise') }]} />
+        <Breadcrumbs
+          items={[
+            { label: t('Dashboard'), href: '/dashboard' },
+            { label: t('Events'), href: '/events' },
+            { label: t('Organise') },
+          ]}
+        />
         <div className="card p-8 text-center">
           <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface text-ink">
             <CircleCheck className="h-6 w-6" strokeWidth={2.2} aria-hidden="true" />
@@ -458,13 +554,21 @@ export default function EventForm() {
             {editId ? t('Changes sent for review') : t('Application sent')}
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-ink/60">
-            {t('An admin will review it. You will see the decision in My events. Your event stays private until it is approved.')}
+            {t(
+              'An admin will review it. You will see the decision in My events. Your event stays private until it is approved.'
+            )}
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link href="/profile?tab=events" className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90">
+            <Link
+              href="/profile?tab=events"
+              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
+            >
               {t('My events')}
             </Link>
-            <Link href="/events" className="rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5">
+            <Link
+              href="/events"
+              className="rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5"
+            >
               {t('Browse events')}
             </Link>
           </div>
@@ -473,9 +577,17 @@ export default function EventForm() {
     )
   }
 
+  const activeCoverDisplayUrl = coverPreviewUrl || form.coverUrl
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Breadcrumbs items={[{ label: t('Dashboard'), href: '/dashboard' }, { label: t('Events'), href: '/events' }, { label: editId ? t('Edit event') : t('Organise') }]} />
+      <Breadcrumbs
+        items={[
+          { label: t('Dashboard'), href: '/dashboard' },
+          { label: t('Events'), href: '/events' },
+          { label: editId ? t('Edit event') : t('Organise') },
+        ]}
+      />
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-ink">
@@ -489,7 +601,9 @@ export default function EventForm() {
       {/* Progress */}
       <div>
         <div className="flex items-center justify-between text-xs font-semibold text-ink/60">
-          <span>{t('Step {n} of 5', { n: step })} · {t(STEPS[step - 1])}</span>
+          <span>
+            {t('Step {n} of 5', { n: step })} · {t(STEPS[step - 1])}
+          </span>
           {!editId && draftSavedAt ? <span className="text-ink/45">{t('Draft saved')}</span> : null}
         </div>
         <div className="mt-2 flex gap-1.5" aria-hidden="true">
@@ -514,7 +628,9 @@ export default function EventForm() {
         {step === 1 ? (
           <section className="card p-6">
             <h2 className="mb-1 text-sm font-bold text-ink">{t('What kind of event is this?')}</h2>
-            <p className="mb-4 text-xs text-ink/50">{t('Pick one. Each type asks a few extra questions later.')}</p>
+            <p className="mb-4 text-xs text-ink/50">
+              {t('Pick one. Each type asks a few extra questions later.')}
+            </p>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               {EVENT_TYPES.map(({ key, label, Icon }) => {
                 const active = form.type === key
@@ -525,7 +641,9 @@ export default function EventForm() {
                     aria-pressed={active}
                     onClick={() => set('type', key)}
                     className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center text-xs font-semibold transition-colors duration-150 ${
-                      active ? 'border-accent bg-surface text-ink' : 'border-ink/15 bg-white text-ink/70 hover:bg-ink/5'
+                      active
+                        ? 'border-accent bg-surface text-ink'
+                        : 'border-ink/15 bg-white text-ink/70 hover:bg-ink/5'
                     }`}
                   >
                     <Icon className="h-9 w-9" />
@@ -581,7 +699,7 @@ export default function EventForm() {
                   <input
                     id="eventDate"
                     type="date"
-                    min={todayISO()}
+                    min={todayDate || undefined}
                     value={form.eventDate}
                     onChange={(event) => set('eventDate', event.target.value)}
                     className={`${inputClass} ${errors.eventDate ? inputInvalid : inputIdle}`}
@@ -640,7 +758,9 @@ export default function EventForm() {
                   {t('Add Nepali translation')}
                 </summary>
                 <p className="mt-2 break-words text-xs text-ink/50">
-                  {t('Shown to readers who switch the site to Nepali. Leave a field blank to fall back to the English text.')}
+                  {t(
+                    'Shown to readers who switch the site to Nepali. Leave a field blank to fall back to the English text.'
+                  )}
                 </p>
                 <div className="mt-4 space-y-4">
                   <Field id="title_ne" label={t('Title in Nepali')} optional>
@@ -678,11 +798,15 @@ export default function EventForm() {
                   {t('Cover photo')}
                   <span className="ml-1.5 text-xs font-normal text-ink/45">{t('optional')}</span>
                 </span>
-                {form.coverUrl || coverFile ? (
+                {activeCoverDisplayUrl || coverFile ? (
                   <div className="flex items-center gap-3 rounded-xl border border-ink/15 bg-white p-3">
-                    {form.coverUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element -- local data URL or Supabase Storage URL */
-                      <img src={form.coverUrl} alt="" className="h-14 w-20 shrink-0 rounded-lg object-cover" />
+                    {activeCoverDisplayUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element -- local preview or Supabase Storage URL */
+                      <img
+                        src={activeCoverDisplayUrl}
+                        alt=""
+                        className="h-14 w-20 shrink-0 rounded-lg object-cover"
+                      />
                     ) : (
                       <span className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg bg-ink/5 text-ink/45">
                         <ImagePlus className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
@@ -748,7 +872,8 @@ export default function EventForm() {
                 </div>
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-ink/50">
                   <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
-                  {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)} — {t('tap the map to move the pin.')}
+                  {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)} —{' '}
+                  {t('tap the map to move the pin.')}
                 </p>
                 {errors.location ? (
                   <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-ink">
@@ -863,7 +988,9 @@ export default function EventForm() {
             <section className="card p-6">
               <h2 className="mb-1 text-sm font-bold text-ink">{t('Questions for review')}</h2>
               <p className="mb-4 text-xs text-ink/50">
-                {t('Private answers that help an admin judge the plan. They are not shown on the public event page.')}
+                {t(
+                  'Private answers that help an admin judge the plan. They are not shown on the public event page.'
+                )}
               </p>
               <div className="space-y-4">
                 {GENERAL_QUESTIONS.map((question) => (
@@ -882,7 +1009,9 @@ export default function EventForm() {
                 <h2 className="mb-1 text-sm font-bold text-ink">
                   {t('{label} questions', { label: t(eventTypeMeta(form.type).label) })}
                 </h2>
-                <p className="mb-4 text-xs text-ink/50">{t('Specific to this event type. Also private.')}</p>
+                <p className="mb-4 text-xs text-ink/50">
+                  {t('Specific to this event type. Also private.')}
+                </p>
                 <div className="space-y-4">
                   {typeQuestions.map((question) => (
                     <QuestionField
@@ -901,15 +1030,53 @@ export default function EventForm() {
               {EVENTS_BACKEND === 'supabase' ? (
                 <>
                   <p className="mb-4 text-xs text-ink/50">
-                    {t('Optional. A PDF or image up to 5 MB (permission letter, plan). Private to admins.')}
+                    {t(
+                      'Optional. A PDF or image up to 5 MB (permission letter, plan). Private to admins.'
+                    )}
                   </p>
+
+                  {existingDocPaths.length > 0 ? (
+                    <div className="mb-3 space-y-2">
+                      {existingDocPaths.map((docPath) => (
+                        <div
+                          key={docPath}
+                          className="flex items-center gap-3 rounded-xl border border-ink/15 bg-surface/60 p-3"
+                        >
+                          <FileUp className="h-4 w-4 shrink-0 text-ink/55" strokeWidth={1.8} />
+                          <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink/80">
+                            {docPath.split('/').pop()}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExistingDocPaths((prev) => prev.filter((p) => p !== docPath))
+                            }
+                            className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-ink/60 hover:bg-ink/5"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            {t('Remove')}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
                   {docFile ? (
                     <div className="flex items-center gap-3 rounded-xl border border-ink/15 bg-white p-3">
-                      <FileUp className="h-5 w-5 shrink-0 text-ink/45" strokeWidth={1.8} aria-hidden="true" />
-                      <span className="min-w-0 flex-1 truncate text-xs text-ink/70">{docFile.name}</span>
+                      <FileUp
+                        className="h-5 w-5 shrink-0 text-ink/45"
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-xs text-ink/70">
+                        {docFile.name}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => setDocFile(null)}
+                        onClick={() => {
+                          setDocFile(null)
+                          if (docInputRef.current) docInputRef.current.value = ''
+                        }}
                         className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-ink/60 transition-colors hover:bg-ink/5"
                       >
                         <X className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
@@ -921,9 +1088,14 @@ export default function EventForm() {
                       htmlFor="document"
                       className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-ink/25 bg-ink/5 px-4 py-3.5 text-sm font-medium text-ink transition-colors hover:border-accent hover:bg-accent/5"
                     >
-                      <FileUp className="h-4 w-4 text-ink/45" strokeWidth={1.8} aria-hidden="true" />
+                      <FileUp
+                        className="h-4 w-4 text-ink/45"
+                        strokeWidth={1.8}
+                        aria-hidden="true"
+                      />
                       {t('Choose a document')}
                       <input
+                        ref={docInputRef}
                         id="document"
                         type="file"
                         accept="application/pdf,image/*"
@@ -967,7 +1139,9 @@ export default function EventForm() {
                     .filter(([, value]) => value)
                     .map(([key, value]) => (
                       <div key={key}>
-                        <dt className="font-semibold text-ink/70">{key}</dt>
+                        <dt className="font-semibold text-ink/70">
+                          {t(questionLabelByKey.get(key) || key)}
+                        </dt>
                         <dd className="text-ink/70">{value}</dd>
                       </div>
                     ))}
@@ -986,7 +1160,9 @@ export default function EventForm() {
                 className="mt-0.5 h-4 w-4 shrink-0 accent-[#ff6b5a]"
               />
               <span className="text-sm text-ink">
-                {t('The details are correct and this is not a duplicate. I understand it stays private until an admin approves it.')}
+                {t(
+                  'The details are correct and this is not a duplicate. I understand it stays private until an admin approves it.'
+                )}
               </span>
             </label>
             {errors.confirm ? (
@@ -1033,7 +1209,11 @@ export default function EventForm() {
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
-              {isSubmitting ? t('Submitting…') : editId ? t('Resubmit for review') : t('Submit for review')}
+              {isSubmitting
+                ? t('Submitting…')
+                : editId
+                  ? t('Resubmit for review')
+                  : t('Submit for review')}
             </button>
           )}
         </div>
