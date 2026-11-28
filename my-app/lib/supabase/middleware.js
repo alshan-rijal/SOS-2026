@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 // Routes that require a signed-in user. Reports themselves are public.
 const PROTECTED_PREFIXES = ['/dashboard', '/reports/new', '/profile']
-const ADMIN_PREFIX = '/admin'
+const ADMIN_PREFIX = '/admin-panel'
 const ADMIN_LOGIN = '/admin/login'
 const AUTH_ROUTES = ['/login', '/register']
 
