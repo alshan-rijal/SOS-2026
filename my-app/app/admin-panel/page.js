@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { connection } from 'next/server'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AdminDashboard from '@/components/AdminDashboard'
@@ -8,6 +9,8 @@ export const metadata = {
 }
 
 async function AdminGuard() {
+  await connection()
+
   const supabase = await createClient()
   const {
     data: { user },
