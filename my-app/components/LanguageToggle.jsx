@@ -29,8 +29,8 @@ export default function LanguageToggle({ className = '' }) {
             aria-label={entry.nativeLabel}
             title={entry.nativeLabel}
             onClick={() => setLang(entry.code)}
-            className={`inline-flex h-10 items-center justify-center gap-2 rounded-md px-2.5 text-xs font-semibold transition-colors duration-150 ${
-              active ? 'bg-ink text-white' : 'text-ink/70 hover:bg-ink/5'
+            className={`chip inline-flex h-10 items-center justify-center gap-2 rounded-md px-2.5 text-xs font-semibold ${
+              active ? 'bg-ink text-white' : 'text-ink/70 hover:bg-surface'
             }`}
           >
             <Flag

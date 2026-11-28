@@ -4,18 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Check, Copy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import {
-  categoryLabel,
-  reportErrorMessage,
-  severityLabel,
-  shortId,
-  updateReportStatus,
-} from '@/lib/reports'
+import { categoryLabel, describeError, severityLabel, shortId, updateReportStatus } from '@/lib/reports'
 import { fetchQueue } from '@/lib/admin'
 import { formatDateTime, timeAgo } from '@/lib/format'
 import { SeverityBadge } from '@/components/Badges'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import DbNotice from '@/components/admin/DbNotice'
+import ErrorCard from '@/components/admin/ErrorCard'
 import { useLanguage } from '@/components/LanguageContext'
 
 export default function AdminQueue() {
@@ -24,24 +19,33 @@ export default function AdminQueue() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(null)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
+  const [dbStale, setDbStale] = useState(false)
   const [sort, setSort] = useState('oldest')
 
-  const load = useCallback(async () => {
+  // `guard` is the effect's cancellation token: a late result from a page the
+  // user has left is dropped instead of setState-ing an unmounted tree.
+  const load = useCallback(async (guard) => {
     setLoading(true)
-    setError('')
+    setError(null)
     try {
-      const { rows: next } = await fetchQueue(supabase, { sort })
-      setRows(next)
+      const { rows: next, dbStale: stale } = await fetchQueue(supabase, { sort })
+      if (guard?.cancelled) return
+      setRows(next ?? [])
+      setDbStale(Boolean(stale))
     } catch (err) {
-      setError(reportErrorMessage(err))
+      if (!guard?.cancelled) setError(describeError(err, 'admin queue'))
     } finally {
-      setLoading(false)
+      if (!guard?.cancelled) setLoading(false)
     }
   }, [supabase, sort])
 
   useEffect(() => {
-    Promise.resolve().then(load)
+    const guard = { cancelled: false }
+    Promise.resolve().then(() => load(guard))
+    return () => {
+      guard.cancelled = true
+    }
   }, [load])
 
   async function verify(row) {
@@ -50,7 +54,7 @@ export default function AdminQueue() {
       await updateReportStatus(supabase, row.id, 'under_verification')
       setRows((prev) => prev.filter((item) => item.id !== row.id))
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(describeError(err, 'verify report'))
     } finally {
       setBusy(null)
     }
@@ -62,7 +66,7 @@ export default function AdminQueue() {
       await updateReportStatus(supabase, row.id, 'cannot_fix', { reason: 'Duplicate report' })
       setRows((prev) => prev.filter((item) => item.id !== row.id))
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(describeError(err, 'reject duplicate'))
     } finally {
       setBusy(null)
     }
@@ -76,26 +80,27 @@ export default function AdminQueue() {
         <p className="text-sm text-ink/60">{t('Oldest first. Verify to move a report to Under verification.')}</p>
         <div className="flex gap-2">
           <button type="button" onClick={() => setSort('oldest')} aria-pressed={sort === 'oldest'}
-            className={`h-9 rounded-full border px-3 text-xs font-semibold ${sort === 'oldest' ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70'}`}>
+            className={`chip h-9 rounded-full border px-3 text-xs font-semibold ${sort === 'oldest' ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70'}`}>
             {t('Sorted by oldest')}
           </button>
           <button type="button" onClick={() => setSort('verifications')} aria-pressed={sort === 'verifications'}
-            className={`h-9 rounded-full border px-3 text-xs font-semibold ${sort === 'verifications' ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70'}`}>
+            className={`chip h-9 rounded-full border px-3 text-xs font-semibold ${sort === 'verifications' ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70'}`}>
             {t('Sorted by verifications')}
           </button>
         </div>
       </div>
 
-      {error ? <DbNotice message={error} /> : null}
+      {dbStale ? <DbNotice /> : null}
+      {error ? <ErrorCard message={error.message} detail={error.detail} onRetry={load} /> : null}
 
       {loading ? (
-        <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-[14px] bg-white" />)}</div>
+        <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="skeleton h-20 rounded-[14px]" />)}</div>
       ) : rows.length === 0 ? (
         <div className="card p-8 text-center text-sm text-ink/60">{t('Queue is empty.')}</div>
       ) : (
         <ul className="space-y-3">
           {rows.map((row) => (
-            <li key={row.id} className="card flex flex-wrap items-center gap-3 p-[clamp(16px,2vw,24px)]">
+            <li key={row.id} className="card card-hover row-hover flex flex-wrap items-center gap-3 p-[clamp(16px,2vw,24px)]">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <SeverityBadge severity={row.severity} />
@@ -110,12 +115,12 @@ export default function AdminQueue() {
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">
-                <button type="button" onClick={() => verify(row)} disabled={busy === row.id}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-ink px-3.5 text-sm font-semibold text-white hover:bg-ink/90 disabled:opacity-50">
-                  <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" /> {t('Verify')}
+                <button type="button" onClick={() => verify(row)} disabled={busy === row.id} aria-busy={busy === row.id}
+                  className="btn btn-primary px-3.5">
+                  {busy === row.id ? <span className="btn-spinner" aria-hidden="true" /> : <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />} {t('Verify')}
                 </button>
                 <button type="button" onClick={() => rejectDuplicate(row)} disabled={busy === row.id}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-ink/15 px-3.5 text-sm font-semibold text-ink hover:bg-ink/5 disabled:opacity-50">
+                  className="btn btn-outline px-3.5">
                   <Copy className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /> {t('Reject as duplicate')}
                 </button>
               </div>

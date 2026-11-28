@@ -13,7 +13,7 @@ const ICONS = {
   cannot_fix: CircleX,
 }
 
-const BADGE = 'inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold'
+const BADGE = 'chip inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold'
 
 /**
  * The one status pill used on cards, tables, map popups and detail pages.

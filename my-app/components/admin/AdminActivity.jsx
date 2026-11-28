@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { listAuditLog } from '@/lib/admin'
+import { describeError } from '@/lib/reports'
 import { formatDateTime } from '@/lib/format'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import DbNotice from '@/components/admin/DbNotice'
+import ErrorCard from '@/components/admin/ErrorCard'
 import { useLanguage } from '@/components/LanguageContext'
 
 export default function AdminActivity() {
@@ -14,24 +16,29 @@ export default function AdminActivity() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [dbStale, setDbStale] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (guard) => {
     setLoading(true)
+    setError(null)
     try {
       const result = await listAuditLog(supabase, 200)
+      if (guard?.cancelled) return
       setRows(result.rows)
       setDbStale(result.dbStale)
     } catch (err) {
-      setError(err?.message || 'Unable to load the activity log.')
+      if (!guard?.cancelled) setError(describeError(err, 'admin activity log'))
     } finally {
-      setLoading(false)
+      if (!guard?.cancelled) setLoading(false)
     }
   }, [supabase])
 
   useEffect(() => {
-    // Deferred so the fetch does not setState synchronously inside the effect.
-    Promise.resolve().then(load)
+    const guard = { cancelled: false }
+    Promise.resolve().then(() => load(guard))
+    return () => {
+      guard.cancelled = true
+    }
   }, [load])
 
   return (
@@ -39,11 +46,11 @@ export default function AdminActivity() {
       <Breadcrumbs items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Admin', href: '/admin' }, { label: 'Activity log' }]} />
 
       {dbStale ? <DbNotice /> : null}
-      {error ? <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-ink">{error}</div> : null}
+      {error ? <ErrorCard message={error.message} detail={error.detail} onRetry={load} /> : null}
 
       <section className="card overflow-hidden">
         {loading ? (
-          <div className="space-y-2 p-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded bg-ink/8" />)}</div>
+          <div className="space-y-2 p-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="skeleton h-10 rounded" />)}</div>
         ) : rows.length === 0 ? (
           <p className="p-8 text-center text-sm text-ink/60">{t('No data in this range.')}</p>
         ) : (
@@ -59,7 +66,7 @@ export default function AdminActivity() {
               </thead>
               <tbody className="divide-y divide-ink/10">
                 {rows.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id} className="row-hover">
                     <td className="whitespace-nowrap py-3 pl-4 pr-3 text-xs text-ink/60">{formatDateTime(row.created_at, lang)}</td>
                     <td className="py-3 pr-3 text-xs font-semibold text-ink">{row.action}</td>
                     <td className="py-3 pr-3 font-mono text-[11px] text-ink/50">{row.entity_id ? row.entity_id.slice(0, 8) : '—'}</td>

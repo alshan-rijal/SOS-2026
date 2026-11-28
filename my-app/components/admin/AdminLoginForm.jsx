@@ -259,7 +259,7 @@ export default function AdminLoginForm() {
               <button
                 type="submit"
                 disabled={isLoading || locked}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-ink text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn btn-primary h-11 w-full"
               >
                 <LogIn className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
                 {isLoading ? t('Signing in…') : locked ? t('Too many attempts. Try again in {n}s.', { n: lockSeconds }) : t('Sign in')}

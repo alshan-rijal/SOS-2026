@@ -50,7 +50,7 @@ function navLinkClass(active, variant = 'desktop') {
     }`
   }
   return `inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors duration-150 ${
-    active ? 'bg-surface text-ink' : 'text-ink/60 hover:bg-ink/5 hover:text-ink'
+    active ? 'bg-surface text-ink' : 'text-ink/60 hover:bg-surface hover:text-ink'
   }`
 }
 
@@ -507,7 +507,7 @@ export default function AppHeader({ fluid = false }) {
           ? t('Notifications, {n} unread', { n: unreadCount })
           : t('Notifications')
       }
-      className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink/70 transition-colors duration-150 hover:bg-ink/5 hover:text-ink"
+      className="btn btn-ghost relative w-10 shrink-0 px-0 text-ink/70"
     >
       <Bell className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
       {unreadCount > 0 ? (
@@ -523,7 +523,7 @@ export default function AppHeader({ fluid = false }) {
       href="/admin"
       aria-label={t('Admin panel')}
       title={t('Admin panel')}
-      className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90 max-[899px]:w-10 max-[899px]:px-0"
+      className="btn btn-cta max-[899px]:w-10 max-[899px]:px-0"
     >
       <ShieldCheck className="h-4 w-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
       <span className="max-[899px]:sr-only">{t('Admin panel')}</span>
@@ -534,7 +534,7 @@ export default function AppHeader({ fluid = false }) {
     <Link
       href="/reports/new"
       aria-label={t('Report issue')}
-      className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-accent px-3.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90 max-[899px]:w-10 max-[899px]:px-0"
+      className="btn btn-cta max-[899px]:w-10 max-[899px]:px-0"
     >
       <Plus className="h-4 w-4 shrink-0" strokeWidth={2.4} aria-hidden="true" />
       <span className="max-[899px]:sr-only">{t('Report issue')}</span>
@@ -548,7 +548,7 @@ export default function AppHeader({ fluid = false }) {
       aria-expanded={openMenu === 'mobile'}
       aria-controls="mobile-menu"
       aria-label={openMenu === 'mobile' ? t('Close menu') : t('Open menu')}
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink/70 transition-colors duration-150 hover:bg-ink/5 hover:text-ink min-[900px]:hidden order-4"
+      className="btn btn-ghost w-10 shrink-0 px-0 text-ink/70 min-[900px]:hidden order-4"
     >
       {openMenu === 'mobile' ? (
         <X className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
@@ -607,13 +607,13 @@ export default function AppHeader({ fluid = false }) {
             <>
               <Link
                 href="/login"
-                className="hidden h-10 items-center rounded-lg px-3 text-sm font-medium text-ink/70 transition-colors duration-150 hover:bg-ink/5 hover:text-ink min-[900px]:inline-flex"
+                className="btn btn-ghost hidden px-3 min-[900px]:inline-flex"
               >
                 {t('Log in')}
               </Link>
               <Link
                 href="/register"
-                className="hidden h-10 items-center rounded-lg bg-accent px-4 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90 min-[900px]:inline-flex"
+                className="btn btn-cta hidden px-4 min-[900px]:inline-flex"
               >
                 {t('Create account')}
               </Link>
@@ -638,7 +638,7 @@ export default function AppHeader({ fluid = false }) {
             <button
               type="button"
               onClick={backToAdmin}
-              className="ml-auto inline-flex h-7 shrink-0 items-center rounded-lg border border-ink bg-white px-2.5 font-semibold text-ink transition-colors duration-150 hover:bg-surface"
+              className="btn btn-outline ml-auto h-7 shrink-0 px-2.5"
             >
               {t('Back to admin panel')}
             </button>
@@ -646,7 +646,7 @@ export default function AppHeader({ fluid = false }) {
               type="button"
               onClick={hideAdminBar}
               aria-label={t('Hide')}
-              className="shrink-0 rounded-md p-1 text-ink/50 transition-colors hover:text-ink"
+              className="btn btn-ghost h-7 w-7 shrink-0 px-0 text-ink/50"
             >
               <X className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
             </button>
@@ -676,14 +676,14 @@ export default function AppHeader({ fluid = false }) {
                 <Link
                   href="/login"
                   onClick={closeMenus}
-                  className="flex h-11 items-center justify-center rounded-lg border border-ink/15 text-sm font-semibold text-ink"
+                  className="btn btn-outline h-11"
                 >
                   {t('Log in')}
                 </Link>
                 <Link
                   href="/register"
                   onClick={closeMenus}
-                  className="flex h-11 items-center justify-center rounded-lg bg-accent text-sm font-semibold text-white"
+                  className="btn btn-cta h-11"
                 >
                   {t('Create account')}
                 </Link>

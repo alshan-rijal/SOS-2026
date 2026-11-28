@@ -3,7 +3,7 @@
 // state, so the module needs no 'use client'; the caller passes `t` in so the
 // visible copy can be translated.
 import Link from 'next/link'
-import { BellRing, Camera, CircleCheck, MapPin, ThumbsUp } from 'lucide-react'
+import { BellRing, CalendarDays, Camera, CircleCheck, EyeOff, Languages, Lock, MapPin, ThumbsUp } from 'lucide-react'
 import { timeAgo } from '@/lib/reports'
 
 // Teardrop map pin, drawn inline so no image file is needed. Mirrors the real
@@ -131,13 +131,59 @@ export function FeatureMock({ kind, t = (text) => text }) {
     )
   }
 
+  if (kind === 'confidential') {
+    return (
+      <div className="mock-screen flex h-[8.5rem] flex-col items-center justify-center gap-3 p-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/5 text-ink" aria-hidden="true">
+          <Lock className="h-5 w-5" strokeWidth={2.1} />
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-ink ring-1 ring-ink/12">
+          <EyeOff className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
+          {t('Only you and admins')}
+        </span>
+      </div>
+    )
+  }
+
+  if (kind === 'events') {
+    return (
+      <div className="mock-screen flex h-[8.5rem] flex-col justify-center gap-2 p-3">
+        {[
+          { icon: CalendarDays, label: t('Blood donation drive') },
+          { icon: CalendarDays, label: t('Neighbourhood clean-up') },
+        ].map(({ icon: Icon, label }) => (
+          <span key={label} className="flex items-center gap-2.5 rounded-xl bg-white px-3 py-2 text-[11px] font-semibold text-ink ring-1 ring-ink/12">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-surface text-ink">
+              <Icon className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
+            </span>
+            <span className="truncate">{label}</span>
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  if (kind === 'language') {
+    return (
+      <div className="mock-screen flex h-[8.5rem] flex-col items-center justify-center gap-4 p-3">
+        <span className="flex items-center gap-1.5 text-ink/45" aria-hidden="true">
+          <Languages className="h-4 w-4" strokeWidth={2.2} />
+        </span>
+        <span className="inline-flex rounded-full bg-white p-1 ring-1 ring-ink/12">
+          <span className="rounded-full bg-ink px-3 py-1 text-[11px] font-semibold text-white">{t('English')}</span>
+          <span className="rounded-full px-3 py-1 text-[11px] font-semibold text-ink/60">{t('Nepali')}</span>
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div className="mock-screen flex h-[8.5rem] flex-col justify-center p-3">
       <ol className="relative space-y-2.5 border-l border-ink/15 pl-4">
         {[
-          { label: 'Pending', done: false },
-          { label: 'In Progress', done: false },
-          { label: 'Resolved', done: true },
+          { label: 'Reported', done: false },
+          { label: 'Being resolved', done: false },
+          { label: 'Fixed', done: true },
         ].map((step) => (
           <li key={step.label} className="relative flex items-center gap-2">
             <span
@@ -163,7 +209,7 @@ export function RecentCard({ report, kind, t = (text) => text, lang = 'en' }) {
   return (
     <Link
       href={`/reports/${report.id}`}
-      className="card group flex h-full flex-col overflow-hidden transition-shadow duration-150 hover:shadow-[0_12px_32px_rgba(11,74,111,0.12)]"
+      className="card card-hover group flex h-full flex-col overflow-hidden"
     >
       <span className="relative block aspect-[16/10] w-full overflow-hidden bg-ink/5">
         {report.image_url ? (

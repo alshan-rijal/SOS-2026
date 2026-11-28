@@ -101,7 +101,7 @@ export default function DashboardPage() {
         setError('')
       } catch (err) {
         if (signal?.aborted) return
-        setError(reportErrorMessage(err))
+        setError(reportErrorMessage(err, 'dashboard'))
       } finally {
         if (!signal?.aborted) setIsLoading(false)
       }
@@ -189,7 +189,7 @@ export default function DashboardPage() {
             : item
         )
       )
-      setError(reportErrorMessage(err))
+      setError(reportErrorMessage(err, 'dashboard'))
     } finally {
       setVerifyingId(null)
     }

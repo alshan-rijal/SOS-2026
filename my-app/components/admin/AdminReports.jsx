@@ -10,8 +10,8 @@ import {
   CATEGORIES,
   SEVERITY_ORDER,
   categoryLabel,
+  describeError,
   fetchReportStats,
-  reportErrorMessage,
   severityLabel,
   shortId,
   statusLabel,
@@ -22,6 +22,7 @@ import { formatDateTime, timeAgo } from '@/lib/format'
 import { SeverityBadge, StatusBadge } from '@/components/Badges'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import DbNotice from '@/components/admin/DbNotice'
+import ErrorCard from '@/components/admin/ErrorCard'
 import { useLanguage } from '@/components/LanguageContext'
 
 const PAGE_SIZES = [25, 50, 100]
@@ -56,7 +57,7 @@ export default function AdminReports({ confidentialOnly = false }) {
   const [rows, setRows] = useState([])
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
   const [dbStale, setDbStale] = useState(false)
   const [statusCounts, setStatusCounts] = useState(null)
   const [selected, setSelected] = useState(() => new Set())
@@ -90,28 +91,33 @@ export default function AdminReports({ confidentialOnly = false }) {
     return () => clearTimeout(timer)
   }, [searchInput, filters.search, replaceParams])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (guard) => {
     setLoading(true)
-    setError('')
+    setError(null)
     try {
       const { rows: nextRows, count: nextCount, dbStale: stale } = await fetchAdminReports(supabase, {
         ...filters,
         from: filters.from ? new Date(`${filters.from}T00:00:00`).toISOString() : undefined,
         to: filters.to ? new Date(`${filters.to}T23:59:59`).toISOString() : undefined,
       })
+      if (guard?.cancelled) return
       setRows(nextRows)
       setCount(nextCount)
       setDbStale(stale)
       setSelected(new Set())
     } catch (err) {
-      setError(reportErrorMessage(err))
+      if (!guard?.cancelled) setError(describeError(err, 'admin reports'))
     } finally {
-      setLoading(false)
+      if (!guard?.cancelled) setLoading(false)
     }
   }, [supabase, filters])
 
   useEffect(() => {
-    Promise.resolve().then(load)
+    const guard = { cancelled: false }
+    Promise.resolve().then(() => load(guard))
+    return () => {
+      guard.cancelled = true
+    }
   }, [load])
 
   useEffect(() => {
@@ -152,14 +158,14 @@ export default function AdminReports({ confidentialOnly = false }) {
   async function bulkVerify() {
     if (selected.size === 0) return
     setBusy(true)
-    setError('')
+    setError(null)
     try {
       for (const id of selected) {
         await updateReportStatus(supabase, id, 'under_verification')
       }
       await load()
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(describeError(err, 'bulk verify'))
     } finally {
       setBusy(false)
     }
@@ -209,9 +215,7 @@ export default function AdminReports({ confidentialOnly = false }) {
       ) : null}
 
       {dbStale ? <DbNotice /> : null}
-      {error ? (
-        <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-ink">{error}</div>
-      ) : null}
+      {error ? <ErrorCard message={error.message} detail={error.detail} onRetry={load} /> : null}
 
       {/* Status chips with counts */}
       <div className="flex flex-wrap gap-2">
@@ -225,7 +229,7 @@ export default function AdminReports({ confidentialOnly = false }) {
                 type="button"
                 onClick={() => replaceParams({ status: chip.key })}
                 aria-pressed={active}
-                className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition-colors duration-150 ${
+                className={`chip inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold ${
                   active ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70 hover:bg-ink/5'
                 }`}
               >
@@ -251,7 +255,7 @@ export default function AdminReports({ confidentialOnly = false }) {
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder={t('Search title, place or report id…')}
             aria-label={t('Search')}
-            className="h-10 w-full rounded-xl border border-ink/15 bg-white pl-9 pr-3 text-sm text-ink placeholder:text-ink/40 focus:border-accent focus:outline-none"
+            className="field h-10 w-full rounded-xl border border-ink/15 bg-white pl-9 pr-3 text-sm text-ink placeholder:text-ink/40 focus:border-accent focus:outline-none"
           />
         </div>
 
@@ -272,19 +276,19 @@ export default function AdminReports({ confidentialOnly = false }) {
         <label className="flex flex-col gap-1 text-xs font-semibold text-ink/60">
           {t('From')}
           <input type="date" value={filters.from} onChange={(e) => replaceParams({ from: e.target.value })}
-            className="h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" />
+            className="field h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold text-ink/60">
           {t('To')}
           <input type="date" value={filters.to} onChange={(e) => replaceParams({ to: e.target.value })}
-            className="h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" />
+            className="field h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" />
         </label>
 
         {hasFilters ? (
           <button
             type="button"
             onClick={() => router.replace(pathname)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-ink/15 px-3 text-sm font-semibold text-ink/70 hover:bg-ink/5"
+            className="btn btn-outline px-3 text-ink/70"
           >
             <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
             {t('Reset')}
@@ -299,7 +303,8 @@ export default function AdminReports({ confidentialOnly = false }) {
             type="button"
             onClick={bulkVerify}
             disabled={busy}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-ink px-3.5 text-sm font-semibold text-white hover:bg-ink/90 disabled:opacity-50"
+            aria-busy={busy}
+            className="btn btn-primary px-3.5"
           >
             <ShieldCheck className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
             {t('Move to Under verification')}
@@ -337,7 +342,7 @@ export default function AdminReports({ confidentialOnly = false }) {
                 Array.from({ length: 8 }).map((_, index) => (
                   <tr key={index}>
                     <td colSpan={11} className="px-3 py-3">
-                      <div className="h-9 w-full animate-pulse rounded bg-ink/8" />
+                      <div className="skeleton h-9 w-full rounded" />
                     </td>
                   </tr>
                 ))
@@ -347,7 +352,7 @@ export default function AdminReports({ confidentialOnly = false }) {
                 </tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.id} className="align-middle hover:bg-surface/30">
+                  <tr key={row.id} className="row-hover align-middle">
                     <td className="py-3 pl-3 pr-2" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(row.id)} onChange={() => toggleOne(row.id)}
                         aria-label={`${t('Select')} ${shortId(row.id)}`} className="h-4 w-4 accent-[#ff6b5a]" />
@@ -395,13 +400,13 @@ export default function AdminReports({ confidentialOnly = false }) {
         <div className="divide-y divide-ink/10 md:hidden">
           {loading ? (
             Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="p-4"><div className="h-16 w-full animate-pulse rounded bg-ink/8" /></div>
+              <div key={index} className="p-4"><div className="skeleton h-16 w-full rounded" /></div>
             ))
           ) : rows.length === 0 ? (
             <p className="p-6 text-center text-sm text-ink/55">{t('No reports match these filters.')}</p>
           ) : (
             rows.map((row) => (
-              <Link key={row.id} href={`/admin/reports/${row.id}`} className="block p-4 hover:bg-surface/40">
+              <Link key={row.id} href={`/admin/reports/${row.id}`} className="row-hover block p-4">
                 <div className="flex items-center gap-2">
                   <StatusBadge status={row.status} />
                   <SeverityBadge severity={row.severity} />
@@ -429,12 +434,12 @@ export default function AdminReports({ confidentialOnly = false }) {
 
           <div className="flex items-center gap-2">
             <button type="button" disabled={filters.page <= 1} onClick={() => replaceParams({ page: filters.page - 1 }, { resetPage: false })}
-              className="inline-flex h-9 items-center gap-1 rounded-lg border border-ink/15 px-3 text-xs font-semibold text-ink disabled:opacity-40">
+              className="btn btn-outline h-9 gap-1 px-3 text-xs disabled:opacity-40">
               <ChevronLeft className="h-4 w-4" aria-hidden="true" /> {t('Previous')}
             </button>
             <span className="text-xs font-medium text-ink/60">{filters.page} / {totalPages}</span>
             <button type="button" disabled={filters.page >= totalPages} onClick={() => replaceParams({ page: filters.page + 1 }, { resetPage: false })}
-              className="inline-flex h-9 items-center gap-1 rounded-lg border border-ink/15 px-3 text-xs font-semibold text-ink disabled:opacity-40">
+              className="btn btn-outline h-9 gap-1 px-3 text-xs disabled:opacity-40">
               {t('Next')} <ChevronRight className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
@@ -454,7 +459,7 @@ function Select({ label, value, onChange, options }) {
     <label className="flex flex-col gap-1 text-xs font-semibold text-ink/60">
       {label}
       <select value={value} onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none">
+        className="field h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none">
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>

@@ -53,7 +53,7 @@ export default function SiteFooter({ fluid = false }) {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-ink/65 transition-colors duration-150 hover:text-ink"
+                    className="link-nudge inline-flex text-sm text-ink/65 transition-colors duration-150 hover:text-ink"
                   >
                     {t(link.label)}
                   </Link>

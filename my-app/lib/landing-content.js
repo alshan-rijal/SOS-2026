@@ -5,11 +5,16 @@
 import {
   BadgeCheck,
   BellRing,
+  Building2,
   Camera,
+  CalendarDays,
   CircleCheck,
   ClipboardList,
   EyeOff,
+  Heart,
   History,
+  Languages,
+  Lock,
   Map as MapIcon,
   MapPin,
   PhoneOff,
@@ -17,6 +22,7 @@ import {
   TrendingUp,
   TriangleAlert,
   ThumbsUp,
+  Users,
 } from 'lucide-react'
 
 export const REASSURANCE = [
@@ -81,6 +87,68 @@ export const FEATURES = [
     text: 'Every change is written to the report timeline with a note and a date.',
     mock: 'timeline',
   },
+  {
+    icon: Lock,
+    title: 'Report privately when it matters',
+    text: 'A confidential report stays visible only to you and the admin team, off the public map and counts.',
+    mock: 'confidential',
+  },
+  {
+    icon: CalendarDays,
+    title: 'Community events, listed and reviewed',
+    text: 'Blood drives, clean-ups, plantation and health camps are posted by organisers and approved before they go live.',
+    mock: 'events',
+  },
+  {
+    icon: Languages,
+    title: 'Nepali and English, one tap apart',
+    text: 'The whole site switches language, including dates and numbers, so a report reads in the language you think in.',
+    mock: 'language',
+  },
+]
+
+// Who the record is for. Three audiences, one public record.
+export const AUDIENCES = [
+  {
+    icon: Users,
+    title: 'Citizens and neighbours',
+    text: 'Spot something, report it in about two minutes, and watch it move instead of wondering if anyone noticed.',
+  },
+  {
+    icon: Building2,
+    title: 'Ward offices and the municipality',
+    text: 'One prioritised, verifiable list of what the neighbourhood is reporting, with counts and locations, not scattered complaints.',
+  },
+  {
+    icon: Heart,
+    title: 'Community groups and volunteers',
+    text: 'See the problems piling up on a street, organise around them, and list your own events for others to join.',
+  },
+]
+
+// The five-step journey, rendered with the real StatusBadge so the landing page
+// and the app never disagree about what a status means.
+export const STATUS_JOURNEY = [
+  {
+    status: 'reported',
+    text: 'A neighbour puts the problem on the map. It is public from this moment.',
+  },
+  {
+    status: 'under_verification',
+    text: 'Others nearby confirm it is real. One verification per account keeps the count honest.',
+  },
+  {
+    status: 'in_progress',
+    text: 'Whoever is responsible has picked it up. The change is stamped on the timeline.',
+  },
+  {
+    status: 'fixed',
+    text: 'The repair is done and recorded, so the street can see it was closed out.',
+  },
+  {
+    status: 'cannot_fix',
+    text: 'It will not be fixed, and the record says why — a reason of at least ten characters is required.',
+  },
 ]
 
 export const STEPS = [
@@ -141,5 +209,15 @@ export const FAQ_ITEMS = [
     question: 'Can I join community events?',
     answer:
       'Yes. Blood donation drives, plantation, clean-ups, food and clothes donation, health camps and awareness campaigns are listed on the Events page. Browse and read them without an account; an account lets you join, and lets you submit your own event for review. Nothing is published until an admin approves it.',
+  },
+  {
+    question: 'Can I keep a report private?',
+    answer:
+      'Yes. A report can be marked confidential when you create it. A confidential report is visible only to you and the admin team: it stays off the public map, public lists and public counts. Only a normal report appears for everyone.',
+  },
+  {
+    question: 'Does the site work in Nepali?',
+    answer:
+      'Yes. Use the language switch in the header to read the whole site in Nepali or English. Dates and numbers follow your choice, and reports can carry a title and description in both languages.',
   },
 ]

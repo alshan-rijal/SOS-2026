@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Check, Lock, ShieldCheck, Trash2, Undo2, Unlock, X } from 'lucide-react'
+import { Check, Lock, ShieldCheck, Trash2, Undo2, Unlock, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   ALL_STATUSES,
@@ -12,12 +12,12 @@ import {
   STATUS_CONFIG,
   categoryLabel,
   deleteReport,
+  describeError,
   fetchReport,
   fetchReportHistory,
   fetchVerifiers,
   isDbUpdateError,
   normalizeStatus,
-  reportErrorMessage,
   setReportConfidential,
   severityLabel,
   shortId,
@@ -32,11 +32,12 @@ import StatusStepper from '@/components/StatusStepper'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import Modal from '@/components/admin/Modal'
 import DbNotice from '@/components/admin/DbNotice'
+import ErrorCard from '@/components/admin/ErrorCard'
 import { useLanguage } from '@/components/LanguageContext'
 
 const ItahariMap = dynamic(() => import('@/components/ItahariMap'), {
   ssr: false,
-  loading: () => <div className="h-full w-full animate-pulse rounded-xl bg-ink/5" />,
+  loading: () => <div className="h-full w-full skeleton rounded-xl" />,
 })
 
 function rank(status) {
@@ -53,7 +54,7 @@ export default function AdminReportReview({ reportId }) {
   const [verifiers, setVerifiers] = useState([])
   const [imageUrl, setImageUrl] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
   const [dbStale, setDbStale] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -67,14 +68,15 @@ export default function AdminReportReview({ reportId }) {
   const [deleteReason, setDeleteReason] = useState('')
   const [toast, setToast] = useState(null) // { message, prevStatus }
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (guard) => {
     setLoading(true)
-    setError('')
+    setError(null)
     try {
       const [result, nextHistory] = await Promise.all([
         fetchReport(supabase, reportId),
         fetchReportHistory(supabase, reportId),
       ])
+      if (guard?.cancelled) return
       if (!result.row) {
         setReport(null)
         return
@@ -112,16 +114,20 @@ export default function AdminReportReview({ reportId }) {
         setImageUrl(normalized.imageUrl || '')
       }
     } catch (err) {
-      if (isDbUpdateError(err)) setError('Admin features need a database update.')
-      else setError(reportErrorMessage(err))
+      if (guard?.cancelled) return
+      setError(describeError(err, 'admin report review'))
       setDbStale(isDbUpdateError(err))
     } finally {
-      setLoading(false)
+      if (!guard?.cancelled) setLoading(false)
     }
   }, [supabase, reportId])
 
   useEffect(() => {
-    Promise.resolve().then(load)
+    const guard = { cancelled: false }
+    Promise.resolve().then(() => load(guard))
+    return () => {
+      guard.cancelled = true
+    }
   }, [load])
 
   // Auto-dismiss the undo toast after 10 seconds.
@@ -158,12 +164,12 @@ export default function AdminReportReview({ reportId }) {
     const needsReason = target === 'cannot_fix' || isBackward
 
     if (needsReason && effectiveReason.length < 10) {
-      setError(t('At least 10 characters.'))
+      setError({ message: t('At least 10 characters.'), detail: '' })
       return
     }
 
     setBusy(true)
-    setError('')
+    setError(null)
     try {
       await updateStatus(target, {
         reason: needsReason ? effectiveReason : undefined,
@@ -187,7 +193,7 @@ export default function AdminReportReview({ reportId }) {
         setToast({ message: t('Saved'), prevStatus: null })
       }
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(describeError(err, 'update report status'))
       setBusy(false)
     }
   }
@@ -204,7 +210,7 @@ export default function AdminReportReview({ reportId }) {
       setToast(null)
       await load()
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(describeError(err, 'undo report status'))
     } finally {
       setBusy(false)
     }
@@ -212,7 +218,7 @@ export default function AdminReportReview({ reportId }) {
 
   async function toggleConfidential() {
     setBusy(true)
-    setError('')
+    setError(null)
     try {
       const next = !report.isConfidential
       await setReportConfidential(supabase, reportId, next)
@@ -224,7 +230,7 @@ export default function AdminReportReview({ reportId }) {
       })
       await load()
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(describeError(err, 'toggle confidential'))
     } finally {
       setBusy(false)
     }
@@ -242,7 +248,7 @@ export default function AdminReportReview({ reportId }) {
       await deleteReport(supabase, reportId)
       router.push('/admin/reports')
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(describeError(err, 'delete report'))
       setBusy(false)
     }
   }
@@ -250,8 +256,8 @@ export default function AdminReportReview({ reportId }) {
   if (loading) {
     return (
       <div className="grid gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2 h-96 animate-pulse rounded-[14px] bg-white" />
-        <div className="h-96 animate-pulse rounded-[14px] bg-white" />
+        <div className="lg:col-span-2 h-96 skeleton rounded-[14px]" />
+        <div className="h-96 skeleton rounded-[14px]" />
       </div>
     )
   }
@@ -288,13 +294,7 @@ export default function AdminReportReview({ reportId }) {
       />
 
       {dbStale ? <DbNotice /> : null}
-      {error ? (
-        <div className="flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-ink">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-          <span className="flex-1">{error}</span>
-          <button type="button" onClick={() => setError('')} className="text-xs font-semibold text-ink/60 hover:text-ink">{t('Cancel')}</button>
-        </div>
-      ) : null}
+      {error ? <ErrorCard message={error.message} detail={error.detail} onRetry={load} /> : null}
 
       <div className="grid gap-5 lg:grid-cols-3">
         {/* Left: details */}
@@ -372,7 +372,7 @@ export default function AdminReportReview({ reportId }) {
             <div className="mt-5 flex flex-col gap-2">
               {nextStep ? (
                 <button type="button" onClick={() => openStatusModal(nextStep)} disabled={busy}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/90 disabled:opacity-50">
+                  className="btn btn-primary px-4">
                   <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
                   {t('Move to')} {statusLabel(nextStep, lang)}
                 </button>
@@ -380,7 +380,7 @@ export default function AdminReportReview({ reportId }) {
 
               {report.status !== 'cannot_fix' && report.status !== 'fixed' ? (
                 <button type="button" onClick={() => openStatusModal('cannot_fix')} disabled={busy}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-50">
+                  className="btn btn-cta px-4">
                   <X className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
                   {t("Can't be fixed")}
                 </button>
@@ -406,7 +406,7 @@ export default function AdminReportReview({ reportId }) {
             </div>
             <p className="mt-1.5 text-xs text-ink/60">{t('Confidential reports are visible only to you and the reporter.')}</p>
             <button type="button" onClick={toggleConfidential} disabled={busy}
-              className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl border border-ink bg-white px-3.5 text-sm font-semibold text-ink hover:bg-surface disabled:opacity-50">
+              className="btn btn-outline mt-3 gap-2 px-3.5">
               {report.isConfidential ? t('Make public') : t('Make confidential')}
             </button>
           </section>

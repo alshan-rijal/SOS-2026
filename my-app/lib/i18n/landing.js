@@ -140,6 +140,69 @@ export const NE_LANDING = {
   'Can I join community events?': 'के म सामुदायिक कार्यक्रमहरूमा सहभागी हुन सक्छु?',
   'Yes. Blood donation drives, plantation, clean-ups, food and clothes donation, health camps and awareness campaigns are listed on the Events page. Browse and read them without an account; an account lets you join, and lets you submit your own event for review. Nothing is published until an admin approves it.':
     'हो। रक्तदान, वृक्षरोपण, सरसफाइ, खाद्यान्न तथा लुगा वितरण, स्वास्थ्य शिविर र सचेतना अभियानहरू कार्यक्रम पृष्ठमा सूचीबद्ध छन्। खाता बिना हेर्न र पढ्न सकिन्छ; खाता भएमा सहभागी हुन र आफ्नै कार्यक्रम समीक्षाका लागि पेश गर्न सकिन्छ। एडमिनले स्वीकृति दिनुअघि केही पनि प्रकाशित हुँदैन।',
+  'Can I keep a report private?': 'के म रिपोर्ट गोप्य राख्न सक्छु?',
+  'Yes. A report can be marked confidential when you create it. A confidential report is visible only to you and the admin team, so it stays off the public map, public lists and public counts.':
+    'हो। रिपोर्ट बनाउँदा गोप्य भनी चिन्ह लगाउन सकिन्छ। गोप्य रिपोर्ट तपाईं र एडमिन टोलीलाई मात्र देखिन्छ, त्यसैले यो सार्वजनिक नक्सा, सूची र गणनामा आउँदैन।',
+  'Does the site work in Nepali?': 'के यो साइट नेपालीमा चल्छ?',
+  'Yes. Use the language switch in the header to read the whole site in Nepali or English. Dates and numbers follow your choice, and reports can carry a title and description in both languages.':
+    'हो। हेडरको भाषा बटनबाट पूरै साइट नेपाली वा अंग्रेजीमा पढ्न सकिन्छ। मिति र संख्या तपाईंको छनोट अनुसार देखिन्छन्, र रिपोर्टमा दुवै भाषाको शीर्षक र विवरण राख्न सकिन्छ।',
+
+  // --- New feature cards ----------------------------------------------------
+  'Report privately when it matters':
+    'आवश्यक पर्दा गोप्य रूपमा रिपोर्ट गर्नुहोस्',
+  'A confidential report stays visible only to you and the admin team, off the public map and counts.':
+    'गोप्य रिपोर्ट तपाईं र एडमिन टोलीलाई मात्र देखिन्छ, सार्वजनिक नक्सा र गणनामा आउँदैन।',
+  'Community events, listed and reviewed': 'सामुदायिक कार्यक्रम, सूचीबद्ध र समीक्षित',
+  'Blood drives, clean-ups, plantation and health camps are posted by organisers and approved before they go live.':
+    'रक्तदान, सरसफाइ, वृक्षरोपण र स्वास्थ्य शिविर आयोजकहरूले राख्छन् र स्वीकृत भएपछि मात्र देखिन्छन्।',
+  'Nepali and English, one tap apart': 'नेपाली र अंग्रेजी, एक ट्यापको दूरीमा',
+  'The whole site switches language, including dates and numbers, so a report reads in the language you think in.':
+    'मिति र संख्यासहित सम्पूर्ण साइट भाषा परिवर्तन गर्छ, त्यसैले तपाईं सोच्ने भाषामै रिपोर्ट पढिन्छ।',
+
+  // --- Who it is for --------------------------------------------------------
+  'Who it is for': 'कसका लागि हो',
+  'One public record, three ways to use it.': 'एउटै सार्वजनिक अभिलेख, प्रयोगका तीन तरिका।',
+  'Citizens and neighbours': 'नागरिक र छिमेकी',
+  'Spot something, report it in about two minutes, and watch it move instead of wondering if anyone noticed.':
+    'केही देख्नुभयो भने करिब दुई मिनेटमै रिपोर्ट गर्नुहोस् र कसैले देख्यो कि भनी अनुमान गर्नुको सट्टा यसको प्रगति हेर्नुहोस्।',
+  'Ward offices and the municipality': 'वडा कार्यालय र नगरपालिका',
+  'One prioritised, verifiable list of what the neighbourhood is reporting, with counts and locations, not scattered complaints.':
+    'छरिएका उजुरी होइन — छिमेकले रिपोर्ट गरेका कुराको संख्या र स्थानसहित एउटै प्राथमिकता-क्रमको, प्रमाणित सूची।',
+  'Community groups and volunteers': 'सामुदायिक समूह र स्वयंसेवक',
+  'See the problems piling up on a street, organise around them, and list your own events for others to join.':
+    'एउटै गल्लीमा थुप्रिँदै गएका समस्याहरू देख्नुहोस्, तिनका वरिपरि संगठित हुनुहोस्, र अरू सहभागी हुन सक्ने आफ्नै कार्यक्रम सूचीबद्ध गर्नुहोस्।',
+
+  // --- Status journey -------------------------------------------------------
+  'How a report moves': 'रिपोर्ट कसरी अघि बढ्छ',
+  'Five steps, each one written down.': 'पाँच चरण, हरेक अभिलेखबद्ध।',
+  'Status is not a label on a wall. Every move is stamped with a date, and a report that cannot be fixed always carries a reason.':
+    'स्थिति भित्तामा टाँसिएको लेबल होइन। हरेक परिवर्तनमा मिति अंकित हुन्छ, र समाधान गर्न नसकिने रिपोर्टमा सधैं कारण लेखिएको हुन्छ।',
+  'A neighbour puts the problem on the map. It is public from this moment.':
+    'छिमेकीले समस्यालाई नक्सामा राख्छ। यो यही क्षणदेखि सार्वजनिक हुन्छ।',
+  'Others nearby confirm it is real. One verification per account keeps the count honest.':
+    'नजिकका अरूले यो साँच्चै हो भनी प्रमाणित गर्छन्। प्रति खाता एक प्रमाणीकरणले संख्या इमानदार राख्छ।',
+  'Whoever is responsible has picked it up. The change is stamped on the timeline.':
+    'जिम्मेवार निकायले यसलाई उठाएको छ। परिवर्तन टाइमलाइनमा अंकित हुन्छ।',
+  'The repair is done and recorded, so the street can see it was closed out.':
+    'मर्मत सम्पन्न भई अभिलेख गरिएको छ, त्यसैले गल्लीले यो टुंगिएको देख्छ।',
+  'It will not be fixed, and the record says why — a reason of at least ten characters is required.':
+    'यो समाधान हुँदैन, र किन हुँदैन भन्ने अभिलेखमा लेखिन्छ — कम्तीमा दस अक्षरको कारण अनिवार्य छ।',
+
+  // --- Events preview -------------------------------------------------------
+  'Show up for the neighbourhood.': 'छिमेकका लागि उपस्थित हुनुहोस्।',
+  'Blood drives, clean-ups, plantation and health camps posted by local organisers and reviewed before they go live.':
+    'स्थानीय आयोजकहरूले राखेका रक्तदान, सरसफाइ, वृक्षरोपण र स्वास्थ्य शिविरहरू स्वीकृत भएपछि मात्र देखिन्छन्।',
+  'See all events': 'सबै कार्यक्रम हेर्नुहोस्',
+  'No upcoming events yet.': 'अहिलेसम्म आउँदो कार्यक्रम छैन।',
+  'Organisers can add one, and it appears here once it is approved.':
+    'आयोजकहरूले थप्न सक्नुहुन्छ, र स्वीकृत भएपछि यहाँ देखिन्छ।',
+  'Browse events': 'कार्यक्रमहरू हेर्नुहोस्',
+  'Community events': 'सामुदायिक कार्यक्रमहरू',
+
+  // --- Feature mocks --------------------------------------------------------
+  'Only you and admins': 'तपाईं र एडमिन मात्र',
+  'Blood donation drive': 'रक्तदान कार्यक्रम',
+  'Neighbourhood clean-up': 'छिमेक सरसफाइ',
 
   // --- Final call -----------------------------------------------------------
   'Start today': 'आजै सुरु गर्नुहोस्',

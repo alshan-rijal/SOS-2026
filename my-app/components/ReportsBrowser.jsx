@@ -99,7 +99,7 @@ export default function ReportsBrowser() {
         if (requestRef.current !== requestId) return
         setReports([])
         setTotal(0)
-        setError(reportErrorMessage(err))
+        setError(reportErrorMessage(err, 'reports list'))
       } finally {
         if (requestRef.current === requestId) setIsLoading(false)
       }
@@ -173,7 +173,7 @@ export default function ReportsBrowser() {
             : item
         )
       )
-      setError(reportErrorMessage(err))
+      setError(reportErrorMessage(err, 'reports list'))
     } finally {
       setVerifyingId(null)
     }

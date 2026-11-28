@@ -158,7 +158,7 @@ export default function ReportDetail() {
       setSimilar(nearby.map((entry) => normalizeReport(entry.row, verifiedIds)))
       setError('')
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(reportErrorMessage(err, 'report detail'))
       setReport(null)
     } finally {
       setIsLoading(false)
@@ -201,7 +201,7 @@ export default function ReportDetail() {
         verifiedByMe: !verified,
         verifications: current.verifications + (verified ? -1 : 1),
       }))
-      setError(reportErrorMessage(err))
+      setError(reportErrorMessage(err, 'report detail'))
     } finally {
       setIsVerifying(false)
     }

@@ -203,7 +203,7 @@ export default function ReportForm() {
       setFormError(
         err?.message === 'Images must be 5 MB or smaller.'
           ? err.message
-          : reportErrorMessage(err)
+          : reportErrorMessage(err, 'report form')
       )
       setIsSubmitting(false)
     }

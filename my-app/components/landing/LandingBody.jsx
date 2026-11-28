@@ -14,10 +14,12 @@ import {
 } from 'lucide-react'
 import CountUp from '@/components/landing/CountUp'
 import LandingFaq from '@/components/landing/LandingFaq'
+import LandingEvents from '@/components/landing/LandingEvents'
 import { FeatureMock, RecentCard } from '@/components/landing/LandingMocks'
+import StatusBadge from '@/components/StatusBadge'
 import { useLanguage } from '@/components/LanguageContext'
 import { DEFAULT_LANG, t as translate } from '@/lib/i18n'
-import { FAQ_ITEMS, FEATURES, PAINS, REASSURANCE, STEPS } from '@/lib/landing-content'
+import { AUDIENCES, FAQ_ITEMS, FEATURES, PAINS, REASSURANCE, STATUS_JOURNEY, STEPS } from '@/lib/landing-content'
 import FrameImage from '@/app/business-images/Frame.png'
 
 const STAT_ICONS = {
@@ -204,7 +206,33 @@ export default function LandingBody({ children }) {
         </div>
       </section>
 
-      {/* 5. Three steps */}
+      {/* 5. The five-step journey, drawn with the real status badges */}
+      <section data-reveal className="landing-section bg-surface">
+        <div className="landing-container">
+          <p className="eyebrow">{t('How a report moves')}</p>
+          <h2 className="display mt-5 max-w-3xl">{t('Five steps, each one written down.')}</h2>
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink/65 sm:text-base">
+            {t(
+              'Status is not a label on a wall. Every move is stamped with a date, and a report that cannot be fixed always carries a reason.'
+            )}
+          </p>
+
+          <ol className="stagger mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+            {STATUS_JOURNEY.map(({ status, text }, index) => (
+              <li key={status} className="card card-hover flex flex-col gap-3 p-5">
+                <span className="text-xs font-bold text-ink/40">{String(index + 1).padStart(2, '0')}</span>
+                <StatusBadge status={status} />
+                <p className="text-sm leading-relaxed text-ink/65">{t(text)}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* 6. Community events, from the same driver as the Events page */}
+      <LandingEvents />
+
+      {/* 7. Three steps */}
       <section id="how-it-works" data-reveal className="landing-section bg-surface">
         <div className="landing-container">
           <p className="eyebrow">{t('How it works')}</p>
@@ -237,8 +265,28 @@ export default function LandingBody({ children }) {
         </div>
       </section>
 
-      {/* 6. FAQ */}
-      <section id="faq" data-reveal className="landing-section bg-white">
+      {/* 8. Who it is for */}
+      <section data-reveal className="landing-section bg-white">
+        <div className="landing-container">
+          <p className="eyebrow">{t('Who it is for')}</p>
+          <h2 className="display mt-5 max-w-3xl">{t('One public record, three ways to use it.')}</h2>
+
+          <div className="stagger mt-12 grid gap-5 md:grid-cols-3">
+            {AUDIENCES.map(({ icon: Icon, title, text }) => (
+              <article key={title} className="card card-hover flex flex-col gap-3 p-6">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink/5 text-ink">
+                  <Icon className="h-5 w-5" strokeWidth={2.1} aria-hidden="true" />
+                </span>
+                <h3 className="text-base font-semibold text-ink">{t(title)}</h3>
+                <p className="text-sm leading-relaxed text-ink/65">{t(text)}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 9. FAQ */}
+      <section id="faq" data-reveal className="landing-section bg-surface">
         <div className="landing-container grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:gap-16">
           <div>
             <p className="eyebrow">{t('FAQ')}</p>
@@ -269,7 +317,7 @@ export default function LandingBody({ children }) {
         </div>
       </section>
 
-      {/* 7. Final call */}
+      {/* 10. Final call */}
       <section data-reveal className="landing-section pt-0">
         <div className="landing-container">
           <div className="cta-panel">

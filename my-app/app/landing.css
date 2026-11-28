@@ -25,7 +25,7 @@ html {
 }
 
 .landing-section {
-  padding-block: clamp(56px, 7vw, 112px);
+  padding-block: clamp(40px, 6vw, 88px);
   /* Leave room for the sticky header when a #hash lands on a section. */
   scroll-margin-top: 5rem;
 }

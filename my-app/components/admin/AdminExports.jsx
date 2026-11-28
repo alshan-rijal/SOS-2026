@@ -8,14 +8,14 @@ import {
   CATEGORIES,
   SEVERITY_ORDER,
   categoryLabel,
-  reportErrorMessage,
+  describeError,
   severityLabel,
   statusLabel,
 } from '@/lib/reports'
 import { RANGE_PRESETS, fetchAdminAnalytics, fetchAdminReports, logAdminAction, resolveRange } from '@/lib/admin'
 import { formatDateTime, formatDuration, formatNumber, formatPercent } from '@/lib/format'
 import Breadcrumbs from '@/components/Breadcrumbs'
-import DbNotice from '@/components/admin/DbNotice'
+import ErrorCard from '@/components/admin/ErrorCard'
 import { useLanguage } from '@/components/LanguageContext'
 
 const MAX_ROWS = 20000
@@ -44,7 +44,7 @@ export default function AdminExports() {
   const [preview, setPreview] = useState(null)
   const [previewing, setPreviewing] = useState(false)
   const [progress, setProgress] = useState(null)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
   const [adminName, setAdminName] = useState('')
 
   // "Certain days" folds into the custom range.
@@ -65,6 +65,12 @@ export default function AdminExports() {
     [status, category, severity, confidential]
   )
 
+  // fetchAdminReports speaks 'all' | 'only' | 'hide'; this screen speaks
+  // include | exclude | only. Map before every call so "Exclude" really hides
+  // confidential reports (it previously fell through and included them).
+  const confidentialParam =
+    confidential === 'exclude' ? 'hide' : confidential === 'only' ? 'only' : 'all'
+
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data?.user) return
@@ -73,27 +79,32 @@ export default function AdminExports() {
     })
   }, [supabase])
 
-  const loadPreview = useCallback(async () => {
+  const loadPreview = useCallback(async (guard) => {
     setPreviewing(true)
-    setError('')
+    setError(null)
     try {
       const [{ count }, analytics] = await Promise.all([
         fetchAdminReports(supabase, {
-          status, category, severity, confidential,
+          status, category, severity, confidential: confidentialParam,
           from: range.from, to: range.to, pageSize: 1,
         }),
         fetchAdminAnalytics(supabase, range),
       ])
+      if (guard?.cancelled) return
       setPreview({ count, analytics })
     } catch (err) {
-      setError(reportErrorMessage(err))
+      if (!guard?.cancelled) setError(describeError(err, 'admin export preview'))
     } finally {
-      setPreviewing(false)
+      if (!guard?.cancelled) setPreviewing(false)
     }
-  }, [supabase, status, category, severity, confidential, range])
+  }, [supabase, status, category, severity, confidentialParam, range])
 
   useEffect(() => {
-    Promise.resolve().then(loadPreview)
+    const guard = { cancelled: false }
+    Promise.resolve().then(() => loadPreview(guard))
+    return () => {
+      guard.cancelled = true
+    }
   }, [loadPreview])
 
   /** Walk the range in pages of 1000, capped at 20,000 rows. */
@@ -103,7 +114,7 @@ export default function AdminExports() {
     let capped = false
     for (;;) {
       const { rows: chunk, count } = await fetchAdminReports(supabase, {
-        status, category, severity, confidential,
+        status, category, severity, confidential: confidentialParam,
         from: range.from, to: range.to, page, pageSize: PAGE_SIZE, sort: 'newest',
       })
       rows.push(...chunk)
@@ -119,7 +130,7 @@ export default function AdminExports() {
   }
 
   async function exportCsv() {
-    setError('')
+    setError(null)
     try {
       const { rows, capped } = await fetchAllRows()
       const headers = ['ID', 'Title', 'Category', 'Place', 'Severity', 'Status', 'Reported', 'Resolved', 'Cannot-fix reason', 'Verifications', 'Reporter', 'Confidential']
@@ -144,14 +155,14 @@ export default function AdminExports() {
         details: { range, filters: filterLabel, rows: rows.length, format: 'csv', capped },
       })
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(describeError(err, 'export CSV'))
     } finally {
       setProgress(null)
     }
   }
 
   async function printPdf() {
-    setError('')
+    setError(null)
     try {
       const { rows } = await fetchAllRows()
       const analytics = preview?.analytics
@@ -226,7 +237,7 @@ ${rows.map((row) => `<tr>
 
       const win = window.open('', '_blank')
       if (!win) {
-        setError('Please allow pop-ups to print the report.')
+        setError({ message: t('Please allow pop-ups to print the report.'), detail: '' })
         return
       }
       win.document.write(html)
@@ -238,7 +249,7 @@ ${rows.map((row) => `<tr>
         details: { range, filters: filterLabel, rows: rows.length, format: 'pdf' },
       })
     } catch (err) {
-      setError(reportErrorMessage(err))
+      setError(describeError(err, 'export PDF'))
     } finally {
       setProgress(null)
     }
@@ -250,14 +261,14 @@ ${rows.map((row) => `<tr>
     <div className="space-y-5">
       <Breadcrumbs items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Admin', href: '/admin' }, { label: 'Exports' }]} />
 
-      {error ? <DbNotice message={error} /> : null}
+      {error ? <ErrorCard message={error.message} detail={error.detail} onRetry={loadPreview} /> : null}
 
       <section className="card p-[clamp(16px,2vw,24px)]">
         <h2 className="text-sm font-bold text-ink">{t('Date range')}</h2>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {RANGE_PRESETS.map((option) => (
             <button key={option.value} type="button" onClick={() => { setPreset(option.value); setCertainDays('') }} aria-pressed={preset === option.value && !certainDays}
-              className={`h-9 rounded-full border px-3 text-xs font-semibold ${preset === option.value && !certainDays ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70 hover:bg-ink/5'}`}>
+              className={`chip h-9 rounded-full border px-3 text-xs font-semibold ${preset === option.value && !certainDays ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70'}`}>
               {t(option.label)}
             </button>
           ))}
@@ -266,13 +277,13 @@ ${rows.map((row) => `<tr>
           {preset === 'custom' ? (
             <>
               <label className="flex flex-col gap-1 text-xs font-semibold text-ink/60">{t('From')}
-                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" /></label>
+                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="field h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" /></label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-ink/60">{t('To')}
-                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" /></label>
+                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="field h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" /></label>
             </>
           ) : null}
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink/60">{t('Certain days')}
-            <input type="number" min="1" value={certainDays} onChange={(e) => setCertainDays(e.target.value)} placeholder={t('Number of days')} className="h-10 w-36 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" /></label>
+            <input type="number" min="1" value={certainDays} onChange={(e) => setCertainDays(e.target.value)} placeholder={t('Number of days')} className="field h-10 w-36 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none" /></label>
         </div>
       </section>
 
@@ -295,7 +306,7 @@ ${rows.map((row) => `<tr>
       <section className="card p-[clamp(16px,2vw,24px)]">
         <h2 className="text-sm font-bold text-ink">{t('Live preview')}</h2>
         {previewing ? (
-          <div className="mt-3 h-20 animate-pulse rounded-xl bg-ink/8" />
+          <div className="mt-3 h-20 skeleton rounded-xl" />
         ) : (
           <div className="mt-3 space-y-3">
             <p className="text-sm text-ink/70">
@@ -324,15 +335,15 @@ ${rows.map((row) => `<tr>
         ) : null}
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={exportCsv} disabled={previewing || Boolean(progress)}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/90 disabled:opacity-50">
-            <FileDown className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /> {t('Download CSV')}
+          <button type="button" onClick={exportCsv} disabled={previewing || Boolean(progress)} aria-busy={Boolean(progress)}
+            className="btn btn-primary px-4">
+            {progress ? <span className="btn-spinner" aria-hidden="true" /> : <FileDown className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />} {t('Download CSV')}
           </button>
-          <button type="button" onClick={printPdf} disabled={previewing || Boolean(progress)}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-ink bg-white px-4 text-sm font-semibold text-ink hover:bg-surface disabled:opacity-50">
+          <button type="button" onClick={printPdf} disabled={previewing || Boolean(progress)} aria-busy={Boolean(progress)}
+            className="btn btn-outline px-4">
             <Printer className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /> {t('Print / Save as PDF')}
           </button>
-          <a href="/admin" className="inline-flex h-10 items-center gap-2 rounded-xl border border-ink/15 px-4 text-sm font-semibold text-ink/70 hover:bg-ink/5">
+          <a href="/admin" className="btn btn-outline px-4 text-ink/70">
             <Download className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /> {t('Overview')}
           </a>
         </div>
@@ -346,7 +357,7 @@ function Filter({ label, value, onChange, options }) {
     <label className="flex flex-col gap-1 text-xs font-semibold text-ink/60">
       {label}
       <select value={value} onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none">
+        className="field h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none">
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>

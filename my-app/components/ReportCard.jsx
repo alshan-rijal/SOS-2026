@@ -7,12 +7,12 @@ import { useLanguage } from '@/components/LanguageContext'
 export default function ReportCard({ report, onVerify, isVerifying = false }) {
   const { t, lang, localize } = useLanguage()
   return (
-    <article className="card flex min-w-0 flex-col p-5 transition-shadow duration-150 hover:shadow-[0_12px_32px_rgba(11,74,111,0.12)]">
+    <article className="card card-hover flex min-w-0 flex-col p-5">
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <SeverityBadge severity={report.severity} />
         <StatusBadge status={report.status} />
         {report.isConfidential ? (
-          <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-ink bg-surface px-2.5 text-xs font-semibold text-ink">
+          <span className="chip inline-flex h-6 items-center gap-1.5 rounded-full border border-ink bg-surface px-2.5 text-xs font-semibold text-ink">
             <Lock className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
             {t('Confidential')}
           </span>
@@ -57,10 +57,8 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
                 report.verifications === 1 ? '{n} verification' : '{n} verifications',
                 { n: report.verifications }
               )}`}
-              className={`inline-flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                report.verifiedByMe
-                  ? 'bg-ink text-white hover:bg-ink/90'
-                  : 'bg-ink/5 text-ink hover:bg-ink/10'
+              className={`btn px-2.5 text-xs ${
+                report.verifiedByMe ? 'btn-primary' : 'btn-outline'
               }`}
             >
               <ThumbsUp className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
@@ -75,10 +73,10 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
 
           <Link
             href={`/reports/${report.id}`}
-            className="inline-flex h-10 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-accent/10"
+            className="btn btn-ghost px-2 text-xs"
           >
             {t('Details')}
-            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
+            <ArrowRight className="btn-arrow h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
           </Link>
         </div>
       </div>
@@ -88,15 +86,15 @@ export default function ReportCard({ report, onVerify, isVerifying = false }) {
 
 export function ReportCardSkeleton() {
   return (
-    <div className="card animate-pulse p-5">
+    <div className="card skeleton p-5">
       <div className="mb-3 flex gap-2">
-        <div className="h-6 w-20 rounded-full bg-ink/8" />
-        <div className="h-6 w-24 rounded-full bg-ink/8" />
+        <div className="h-6 w-20 rounded-full bg-white/60" />
+        <div className="h-6 w-24 rounded-full bg-white/60" />
       </div>
-      <div className="h-4 w-3/4 rounded bg-ink/8" />
-      <div className="mt-2 h-3 w-1/2 rounded bg-ink/8" />
-      <div className="mt-3 h-3 w-full rounded bg-ink/8" />
-      <div className="mt-2 h-3 w-5/6 rounded bg-ink/8" />
+      <div className="h-4 w-3/4 rounded bg-white/60" />
+      <div className="mt-2 h-3 w-1/2 rounded bg-white/60" />
+      <div className="mt-3 h-3 w-full rounded bg-white/60" />
+      <div className="mt-2 h-3 w-5/6 rounded bg-white/60" />
     </div>
   )
 }

@@ -8,14 +8,38 @@ import { createClient } from '@/lib/supabase/client'
 
 export const backendName = 'supabase'
 
-const EVENT_SELECT =
+// The scalar columns every reader may see. The two embedded tables
+// (event_applications, event_status_history) are members-only under RLS, so
+// requesting them for an anonymous reader makes PostgREST reject the whole
+// query with 401. Public reads use EVENT_COLUMNS; only the organiser path adds
+// the private embeds (see getEvent / listMyEvents).
+const EVENT_COLUMNS =
   'id,organizer_id,type,title,description,event_date,start_time,end_time,address,ward,' +
   'latitude,longitude,radius_m,max_participants,what_to_bring,cover_url,organization_name,' +
   'contact_name,contact_phone,contact_email,status,review_notes,rejection_reason,' +
   'reviewed_by,reviewed_at,submitted_at,created_at,updated_at,' +
-  'title_ne,description_ne,address_ne,' +
+  'title_ne,description_ne,address_ne'
+
+const EVENT_SELECT =
+  `${EVENT_COLUMNS},` +
   'event_applications(answers,document_paths),' +
   'event_status_history(id,from_status,to_status,note,created_at)'
+
+/** The organiser-only embeds, fetched separately so public reads never 401. */
+async function ownerPrivateBits(eventId) {
+  const [applications, history] = await Promise.all([
+    client().from('event_applications').select('answers,document_paths').eq('event_id', eventId).maybeSingle(),
+    client()
+      .from('event_status_history')
+      .select('id,from_status,to_status,note,created_at')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: true }),
+  ])
+  return {
+    event_applications: applications.error || !applications.data ? [] : [applications.data],
+    event_status_history: history.error ? [] : history.data ?? [],
+  }
+}
 
 function client() {
   return createClient()
@@ -114,7 +138,7 @@ export async function listEvents(filters = {}) {
   const userId = await currentUserId()
   const supabase = client()
 
-  let query = supabase.from('events').select(EVENT_SELECT).eq('status', 'approved')
+  let query = supabase.from('events').select(EVENT_COLUMNS).eq('status', 'approved')
   if (type) query = query.eq('type', type)
   if (when === 'upcoming') query = query.gte('event_date', new Date().toISOString().slice(0, 10))
   if (when === 'today') query = query.eq('event_date', new Date().toISOString().slice(0, 10))
@@ -141,11 +165,15 @@ export async function listEvents(filters = {}) {
 
 export async function getEvent(id) {
   const userId = await currentUserId()
-  const { data, error } = await client().from('events').select(EVENT_SELECT).eq('id', id).maybeSingle()
+  const { data, error } = await client().from('events').select(EVENT_COLUMNS).eq('id', id).maybeSingle()
   if (error) throw error
   if (!data) return null
-  const { counts, joined } = await participationFor([id], userId)
-  return normalize(data, userId, counts.get(id) ?? 0, joined.has(id))
+  const isOrganiser = Boolean(userId && data.organizer_id === userId)
+  const [{ counts, joined }, privateBits] = await Promise.all([
+    participationFor([id], userId),
+    isOrganiser ? ownerPrivateBits(id) : Promise.resolve({}),
+  ])
+  return normalize({ ...data, ...privateBits }, userId, counts.get(id) ?? 0, joined.has(id))
 }
 
 export async function listMyEvents() {

@@ -69,34 +69,28 @@ async function loadCommunityProof() {
   try {
     const supabase = await createClient()
 
-    // Public counts never include confidential reports. The filter is added on
-    // top of RLS, and dropped only if migration 007 is not applied yet (42703).
-    const countOf = (apply) => {
-      const build = (publicOnly) => {
-        let query = supabase.from('reports').select('id', { count: 'exact', head: true })
-        if (publicOnly) query = query.eq('is_confidential', false)
-        if (apply) query = apply(query)
-        return query
-      }
-      return build(true).then((result) =>
-        result.error?.code === '42703' ? build(false) : result
-      )
+    // Confidential reports are hidden by RLS (migration 007), so these counts
+    // need no is_confidential filter. A status filter mixing the new and old
+    // vocabularies is rejected on the pre-006 enum (22P02), so it retries with
+    // the legacy value.
+    const head = () => supabase.from('reports').select('id', { count: 'exact', head: true })
+    const countOf = async (statuses, legacy) => {
+      const res = statuses ? await head().in('status', statuses) : await head()
+      if (res.error?.code === '22P02' && legacy) return head().in('status', legacy)
+      return res
     }
 
-    const resolvedRowsQuery = (publicOnly) => {
-      let query = supabase
+    const resolvedRowsQuery = (legacy) =>
+      supabase
         .from('reports')
         .select(RECENT_SELECT)
-        .in('status', ['fixed', 'resolved'])
+        .in('status', legacy ? ['resolved'] : ['fixed', 'resolved'])
         .order('updated_at', { ascending: false })
         .limit(3)
-      if (publicOnly) query = query.eq('is_confidential', false)
-      return query
-    }
 
     const [submitted, resolved, verifications, contributors, resolvedFirst] = await Promise.all([
       countOf(),
-      countOf((query) => query.in('status', ['fixed', 'resolved'])),
+      countOf(['fixed', 'resolved'], ['resolved']),
       supabase.from('report_verifications').select('report_id', { count: 'exact', head: true }),
       // shortcut: contributors = distinct reporter ids over the newest 1000
       // reports; move to a SQL view if the table grows past that.
@@ -105,9 +99,9 @@ async function loadCommunityProof() {
         .select('user_id')
         .not('user_id', 'is', null)
         .limit(1000),
-      resolvedRowsQuery(true),
+      resolvedRowsQuery(false),
     ])
-    const resolvedRows = resolvedFirst.error?.code === '42703' ? await resolvedRowsQuery(false) : resolvedFirst
+    const resolvedRows = resolvedFirst.error?.code === '22P02' ? await resolvedRowsQuery(true) : resolvedFirst
 
     if (
       submitted.error ||

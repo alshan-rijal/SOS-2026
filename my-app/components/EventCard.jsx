@@ -9,7 +9,7 @@ import { useLanguage } from '@/components/LanguageContext'
 
 export function EventCardSkeleton() {
   return (
-    <div className="card h-48 w-full animate-pulse" aria-hidden="true" />
+    <div className="card skeleton h-48 w-full" aria-hidden="true" />
   )
 }
 
@@ -22,7 +22,7 @@ export default function EventCard({ event, onJoin, onLeave, joining = false }) {
   const title = localize(event, 'title')
 
   return (
-    <article className="card flex min-w-0 flex-col gap-3 p-4">
+    <article className="card card-hover flex min-w-0 flex-col gap-3 p-4">
       <div className="flex items-start gap-3">
         <EventTypeIcon type={event.type} className="h-10 w-10 shrink-0" />
         <div className="min-w-0 flex-1">
@@ -63,7 +63,7 @@ export default function EventCard({ event, onJoin, onLeave, joining = false }) {
       </dl>
 
       <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-        <Link href={`/events/${event.id}`} className="text-xs font-semibold text-ink hover:underline">
+        <Link href={`/events/${event.id}`} className="link-underline text-xs font-semibold text-ink">
           {t('View details')}
         </Link>
 
@@ -75,11 +75,11 @@ export default function EventCard({ event, onJoin, onLeave, joining = false }) {
           <button
             type="button"
             disabled={joining || (full && !event.joined)}
+            aria-busy={joining}
             onClick={() => (event.joined ? onLeave(event) : onJoin(event))}
-            className={`inline-flex h-10 items-center rounded-lg px-3 text-xs font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60 ${
-              event.joined ? 'bg-surface text-ink' : 'bg-accent text-white hover:bg-accent/90'
-            }`}
+            className={`btn px-3 text-xs ${event.joined ? 'btn-outline' : 'btn-cta'}`}
           >
+            {joining ? <span className="btn-spinner" aria-hidden="true" /> : null}
             {joining ? t('Saving…') : event.joined ? t('Leave') : full ? t('Event full') : t('Join')}
           </button>
         ) : null}

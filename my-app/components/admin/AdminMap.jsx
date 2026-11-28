@@ -4,15 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { ALL_STATUSES, reportErrorMessage, statusLabel } from '@/lib/reports'
+import { ALL_STATUSES, describeError, statusLabel } from '@/lib/reports'
 import { fetchAdminReports } from '@/lib/admin'
 import Breadcrumbs from '@/components/Breadcrumbs'
-import DbNotice from '@/components/admin/DbNotice'
+import ErrorCard from '@/components/admin/ErrorCard'
 import { useLanguage } from '@/components/LanguageContext'
 
 const ItahariMap = dynamic(() => import('@/components/ItahariMap'), {
   ssr: false,
-  loading: () => <div className="h-full w-full animate-pulse rounded-[14px] bg-ink/5" />,
+  loading: () => <div className="h-full w-full skeleton rounded-[14px]" />,
 })
 
 export default function AdminMap() {
@@ -21,23 +21,28 @@ export default function AdminMap() {
   const [rows, setRows] = useState([])
   const [status, setStatus] = useState('all')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (guard) => {
     setLoading(true)
     try {
       const result = await fetchAdminReports(supabase, { confidential: 'all', pageSize: 500 })
+      if (guard?.cancelled) return
       setRows(result.rows)
-      setError('')
+      setError(null)
     } catch (err) {
-      setError(reportErrorMessage(err))
+      if (!guard?.cancelled) setError(describeError(err, 'admin map'))
     } finally {
-      setLoading(false)
+      if (!guard?.cancelled) setLoading(false)
     }
   }, [supabase])
 
   useEffect(() => {
-    Promise.resolve().then(load)
+    const guard = { cancelled: false }
+    Promise.resolve().then(() => load(guard))
+    return () => {
+      guard.cancelled = true
+    }
   }, [load])
 
   const visible = useMemo(
@@ -54,7 +59,7 @@ export default function AdminMap() {
         <div className="flex flex-wrap gap-2">
           {[{ key: 'all', label: 'All' }, ...ALL_STATUSES.map((key) => ({ key, label: statusLabel(key, lang) }))].map((chip) => (
             <button key={chip.key} type="button" onClick={() => setStatus(chip.key)} aria-pressed={status === chip.key}
-              className={`h-9 rounded-full border px-3 text-xs font-semibold ${status === chip.key ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70 hover:bg-ink/5'}`}>
+              className={`chip h-9 rounded-full border px-3 text-xs font-semibold ${status === chip.key ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70'}`}>
               {chip.label}
             </button>
           ))}
@@ -64,12 +69,12 @@ export default function AdminMap() {
         </p>
       </div>
 
-      {error ? <DbNotice message={error} /> : null}
+      {error ? <ErrorCard message={error.message} detail={error.detail} onRetry={load} /> : null}
 
       <section className="card overflow-hidden">
         <div className="h-[clamp(360px,60vh,640px)]">
           {loading ? (
-            <div className="h-full w-full animate-pulse bg-ink/5" />
+            <div className="h-full w-full skeleton" />
           ) : (
             <ItahariMap reports={visible} zones={[]} showZones={false} zoom={12} fitToReports className="h-full" />
           )}

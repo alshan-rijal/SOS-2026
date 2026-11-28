@@ -10,6 +10,7 @@ import {
   CATEGORIES,
   SEVERITY_ORDER,
   isDbUpdateError,
+  isLegacyStatusError,
   normalizeReport,
   normalizeStatus,
 } from './reports.js'
@@ -69,14 +70,18 @@ export async function fetchAdminReports(
   supabase,
   { search, status, category, severity, confidential = 'all', from, to, sort = 'newest', page = 1, pageSize = 25 } = {}
 ) {
-  const build = (withConfidential) => {
+  const build = (withConfidential, useLegacyStatus) => {
     let query = supabase.from('reports').select(REPORT_SELECT, { count: 'exact' })
 
     const term = search ? sanitizeSearchTerm(search) : ''
     if (term) {
       query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%,location_name.ilike.%${term}%`)
     }
-    if (status && status !== 'all') query = query.in('status', statusAliases(status))
+    if (status && status !== 'all') {
+      query = useLegacyStatus
+        ? query.eq('status', legacyStatusValue(status))
+        : query.in('status', statusAliases(status))
+    }
     if (category && category !== 'All') query = query.eq('category', category)
     if (severity && severity !== 'all') query = query.eq('severity', severity)
     if (from) query = query.gte('created_at', from)
@@ -93,15 +98,28 @@ export async function fetchAdminReports(
   }
 
   const wantsConfidentialFilter = confidential === 'only' || confidential === 'hide'
-  let { data, error, count } = await build(wantsConfidentialFilter)
+  let { data, error, count } = await build(wantsConfidentialFilter, false)
+  let dbStale = false
 
-  if (error && wantsConfidentialFilter && isDbUpdateError(error)) {
-    ;({ data, error, count } = await build(false))
-    if (!error) return { rows: (data ?? []).map((row) => normalizeReport(row)), count: count ?? 0, dbStale: true }
+  // Migration 007 missing: drop the confidential filter and retry.
+  if (error && wantsConfidentialFilter && (isDbUpdateError(error) || isLegacyStatusError(error))) {
+    ;({ data, error, count } = await build(false, false))
+    dbStale = true
   }
+
+  // Migration 006 missing: the status column is still the old enum, so a filter
+  // on 'reported'/'fixed' is rejected. Retry with the legacy value (pending /
+  // resolved); a new-only status like under_verification simply matches nothing.
+  if (error && isLegacyStatusError(error)) {
+    const legacy = legacyStatusValue(status)
+    if (!legacy) return { rows: [], count: 0, dbStale: true }
+    ;({ data, error, count } = await build(false, true))
+    dbStale = true
+  }
+
   if (error) throw error
 
-  return { rows: (data ?? []).map((row) => normalizeReport(row)), count: count ?? 0, dbStale: false }
+  return { rows: (data ?? []).map((row) => normalizeReport(row)), count: count ?? 0, dbStale }
 }
 
 // A status filter matches both the new value and its legacy twin.
@@ -109,6 +127,16 @@ function statusAliases(status) {
   if (status === 'reported') return ['reported', 'pending']
   if (status === 'fixed') return ['fixed', 'resolved']
   return [status]
+}
+
+// The single-value twin of a new status on the pre-006 enum, or null when the
+// old vocabulary has no equivalent (under_verification, cannot_fix) — those
+// match nothing rather than failing the whole query.
+function legacyStatusValue(status) {
+  if (status === 'reported') return 'pending'
+  if (status === 'fixed') return 'resolved'
+  if (status === 'in_progress') return 'in_progress'
+  return null
 }
 
 function hoursBetween(a, b) {

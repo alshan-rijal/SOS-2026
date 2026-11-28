@@ -151,17 +151,19 @@ export default function EventForm() {
   const draftKey = editId ? `${DRAFT_KEY}:${editId}` : DRAFT_KEY
 
   useEffect(() => {
-    setTodayDate(localTodayISO())
+    // Deferred: localTodayISO() reads the browser clock, which differs from the
+    // server's, so it cannot be computed during render without a mismatch.
+    Promise.resolve().then(() => setTodayDate(localTodayISO()))
   }, [])
 
   // Revoke local object URL when coverFile changes or component unmounts
   useEffect(() => {
     if (!coverFile) {
-      setCoverPreviewUrl(null)
+      Promise.resolve().then(() => setCoverPreviewUrl(null))
       return
     }
     const objectUrl = URL.createObjectURL(coverFile)
-    setCoverPreviewUrl(objectUrl)
+    Promise.resolve().then(() => setCoverPreviewUrl(objectUrl))
     return () => URL.revokeObjectURL(objectUrl)
   }, [coverFile])
 
@@ -281,7 +283,7 @@ export default function EventForm() {
       .finally(() => setDraftRestored(true))
   }, [draftKey, editId, draftRestored])
 
-  const typeQuestions = TYPE_QUESTIONS[form.type] ?? []
+  const typeQuestions = useMemo(() => TYPE_QUESTIONS[form.type] ?? [], [form.type])
 
   const questionLabelByKey = useMemo(() => {
     const map = new Map()

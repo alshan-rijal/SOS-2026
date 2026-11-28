@@ -62,12 +62,12 @@ export default function Modal({ open, title, onClose, children, footer, labelled
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-[14px] border border-ink/12 bg-white shadow-[0_24px_64px_rgba(11,74,111,0.28)]"
+        className="pop-in relative z-10 w-full max-w-md overflow-hidden rounded-[14px] border border-ink/12 bg-white shadow-[0_24px_64px_rgba(11,74,111,0.28)]"
       >
         <div className="flex items-center justify-between gap-3 border-b border-ink/10 p-4">
           <h2 id={labelledBy} className="text-base font-bold text-ink">{title}</h2>
           <button type="button" onClick={onClose} aria-label={t('Close')}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink/60 hover:bg-ink/5 hover:text-ink">
+            className="btn btn-ghost h-9 w-9 px-0 text-ink/60">
             <X className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
           </button>
         </div>

@@ -19,12 +19,13 @@ import {
 } from 'recharts'
 import { AlertTriangle, CircleCheck, Clock, Download, FileText, Lock, Loader, ShieldX } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { categoryLabel, isDbUpdateError, reportErrorMessage, statusLabel } from '@/lib/reports'
+import { categoryLabel, describeError, statusLabel } from '@/lib/reports'
 import { RANGE_PRESETS, fetchAdminAnalytics, resolveRange } from '@/lib/admin'
 import { formatDate, formatDuration, formatNumber, formatPercent } from '@/lib/format'
 import StatusBadge from '@/components/StatusBadge'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import DbNotice from '@/components/admin/DbNotice'
+import ErrorCard from '@/components/admin/ErrorCard'
 import { useLanguage } from '@/components/LanguageContext'
 
 // Palette-only donut tones. The legend carries the number and the percentage, so
@@ -46,7 +47,7 @@ export default function AdminOverview() {
   const [data, setData] = useState(null)
   const [confidential, setConfidential] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
 
   const range = useMemo(() => resolveRange(preset, customFrom, customTo), [preset, customFrom, customTo])
 
@@ -63,29 +64,30 @@ export default function AdminOverview() {
     [router, pathname, searchParams]
   )
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (guard) => {
     setLoading(true)
-    setError('')
+    setError(null)
     try {
       const [analytics, conf] = await Promise.all([
         fetchAdminAnalytics(supabase, range),
         supabase.from('reports').select('id', { count: 'exact', head: true }).eq('is_confidential', true),
       ])
+      if (guard?.cancelled) return
       setData(analytics)
       setConfidential(conf.error ? null : conf.count ?? 0)
     } catch (err) {
-      if (isDbUpdateError(err)) {
-        setError('Admin features need a database update.')
-      } else {
-        setError(reportErrorMessage(err))
-      }
+      if (!guard?.cancelled) setError(describeError(err, 'admin overview'))
     } finally {
-      setLoading(false)
+      if (!guard?.cancelled) setLoading(false)
     }
   }, [supabase, range])
 
   useEffect(() => {
-    Promise.resolve().then(load)
+    const guard = { cancelled: false }
+    Promise.resolve().then(() => load(guard))
+    return () => {
+      guard.cancelled = true
+    }
   }, [load])
 
   const kpis = useMemo(() => {
@@ -139,8 +141,8 @@ export default function AdminOverview() {
             type="button"
             onClick={() => setRange({ range: option.value })}
             aria-pressed={preset === option.value}
-            className={`inline-flex h-9 items-center rounded-full border px-3 text-xs font-semibold transition-colors ${
-              preset === option.value ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70 hover:bg-ink/5'
+            className={`chip inline-flex h-9 items-center rounded-full border px-3 text-xs font-semibold ${
+              preset === option.value ? 'border-ink bg-ink text-white' : 'border-ink/15 bg-white text-ink/70'
             }`}
           >
             {t(option.label)}
@@ -155,24 +157,25 @@ export default function AdminOverview() {
           </span>
         ) : null}
 
-        <Link href="/admin/exports" className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-xl border border-ink bg-white px-3 text-xs font-semibold text-ink hover:bg-surface">
+        <Link href="/admin/exports" className="btn btn-outline ml-auto h-9 px-3 text-xs">
           <Download className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
           {t('Export')}
         </Link>
       </div>
 
-      {error ? <DbNotice message={error} /> : null}
+      {data?.dbStale ? <DbNotice /> : null}
+      {error ? <ErrorCard message={error.message} detail={error.detail} onRetry={load} /> : null}
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {kpis.map(({ key, label, value, icon: Icon }) => (
-          <div key={key} className="card flex flex-col gap-3 p-[clamp(16px,2vw,24px)]">
+          <div key={key} className="card card-hover flex flex-col gap-3 p-[clamp(16px,2vw,24px)]">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface text-ink">
               <Icon className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
             </span>
             <div>
               <p className="text-2xl font-bold tracking-tight text-ink">
-                {loading ? <span className="inline-block h-6 w-10 animate-pulse rounded bg-ink/8" /> : formatNumber(value ?? 0, lang)}
+                {loading ? <span className="skeleton inline-block h-6 w-10 rounded" /> : formatNumber(value ?? 0, lang)}
               </p>
               <p className="mt-0.5 text-xs font-medium text-ink/60">{t(label)}</p>
             </div>
@@ -192,7 +195,7 @@ export default function AdminOverview() {
           <h2 className="text-base font-bold text-ink">{t('Issues by category')}</h2>
           <div className="mt-4 h-64">
             {loading ? (
-              <div className="h-full w-full animate-pulse rounded bg-ink/8" />
+              <div className="h-full w-full skeleton rounded" />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categoryData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
@@ -216,7 +219,7 @@ export default function AdminOverview() {
           <h2 className="text-base font-bold text-ink">{t('Report volume')}</h2>
           <div className="mt-4 h-64">
             {loading ? (
-              <div className="h-full w-full animate-pulse rounded bg-ink/8" />
+              <div className="h-full w-full skeleton rounded" />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={volumeData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
@@ -311,7 +314,7 @@ const tooltipStyle = {
 
 function Metric({ label, value }) {
   return (
-    <div className="card p-[clamp(16px,2vw,24px)]">
+    <div className="card card-hover p-[clamp(16px,2vw,24px)]">
       <p className="text-xs font-semibold uppercase tracking-wider text-ink/55">{label}</p>
       <p className="mt-2 text-2xl font-bold tracking-tight text-ink">{value}</p>
     </div>

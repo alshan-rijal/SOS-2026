@@ -130,7 +130,7 @@ function MyEventCard({ event, onAction, busy }) {
           {canEdit ? (
             <Link
               href={`/events/new?edit=${event.id}`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink/15 px-3 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-ink/5"
+              className="btn btn-outline h-9 gap-1.5 px-3 text-xs"
             >
               <Pencil className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
               {t('Edit and resubmit')}
@@ -141,7 +141,7 @@ function MyEventCard({ event, onAction, busy }) {
               type="button"
               disabled={busy}
               onClick={() => onAction('withdraw', event)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ink/15 px-3 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-ink/5 disabled:opacity-50"
+              className="btn btn-outline h-9 gap-1.5 px-3 text-xs"
             >
               <X className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
               {t('Withdraw')}
@@ -238,7 +238,7 @@ export default function ProfileView() {
       setMyEvents(events)
       setLoadError('')
     } catch (err) {
-      setLoadError(reportErrorMessage(err))
+      setLoadError(reportErrorMessage(err, 'profile'))
     } finally {
       setIsLoading(false)
     }
@@ -294,7 +294,7 @@ export default function ProfileView() {
       setUser((current) => ({ ...current, user_metadata: { ...current.user_metadata, ...values } }))
     } catch (err) {
       setSaveState('error')
-      setSaveError(reportErrorMessage(err))
+      setSaveError(reportErrorMessage(err, 'profile'))
     }
   }
 
@@ -536,7 +536,7 @@ export default function ProfileView() {
               </select>
               <Link
                 href="/reports/new"
-                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-accent px-3.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90"
+                className="btn btn-cta px-3.5"
               >
                 <Plus className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
                 {t('New')}
@@ -619,7 +619,7 @@ export default function ProfileView() {
             <h2 className="text-base font-bold text-ink">{t('My events')}</h2>
             <Link
               href="/events/new"
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-accent px-3.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90"
+              className="btn btn-cta px-3.5"
             >
               <Plus className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
               {t('Organise an event')}
@@ -756,7 +756,7 @@ export default function ProfileView() {
             <button
               type="submit"
               disabled={saveState === 'saving'}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ink px-4 text-sm font-semibold text-white transition-colors duration-150 hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn btn-primary px-4"
             >
               <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
               {saveState === 'saving' ? t('Saving…') : t('Save changes')}
@@ -815,7 +815,7 @@ export default function ProfileView() {
             <button
               type="submit"
               disabled={passwordState === 'saving'}
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-ink/15 px-4 text-sm font-semibold text-ink transition-colors duration-150 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn btn-outline px-4"
             >
               {passwordState === 'saving' ? t('Updating…') : t('Change password')}
             </button>

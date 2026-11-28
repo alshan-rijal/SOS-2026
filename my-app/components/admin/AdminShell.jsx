@@ -263,7 +263,7 @@ export default function AdminShell({ children }) {
               <Link
                 href="/"
                 title={t('View public site')}
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-ink bg-white px-3 text-sm font-semibold text-ink transition-colors duration-150 hover:bg-surface max-[1100px]:hidden"
+                className="btn btn-outline px-3 max-[1100px]:hidden"
               >
                 <ArrowUpRight className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" />
                 {t('View public site')}

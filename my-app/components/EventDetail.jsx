@@ -125,7 +125,7 @@ function DevReviewPanel({ event, onReviewed }) {
           type="button"
           disabled={busy !== ''}
           onClick={() => act('approve')}
-          className="inline-flex h-9 items-center rounded-lg bg-ink px-3 text-xs font-semibold text-white transition-colors duration-150 hover:bg-ink/90 disabled:opacity-50"
+          className="btn btn-primary h-9 px-3 text-xs"
         >
           {busy === 'approve' ? 'Saving…' : 'Approve'}
         </button>
@@ -141,7 +141,7 @@ function DevReviewPanel({ event, onReviewed }) {
           type="button"
           disabled={busy !== ''}
           onClick={() => act('reject')}
-          className="inline-flex h-9 items-center rounded-lg border border-ink/20 px-3 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-ink/5 disabled:opacity-50"
+          className="btn btn-outline h-9 px-3 text-xs"
         >
           {busy === 'reject' ? 'Saving…' : 'Reject'}
         </button>

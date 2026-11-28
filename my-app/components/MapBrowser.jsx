@@ -88,7 +88,7 @@ export default function MapBrowser() {
         setError('')
       } catch (err) {
         if (signal?.aborted) return
-        setError(reportErrorMessage(err))
+        setError(reportErrorMessage(err, 'map'))
       } finally {
         if (!signal?.aborted) setIsLoading(false)
       }
@@ -190,7 +190,7 @@ export default function MapBrowser() {
             : item
         )
       )
-      setError(reportErrorMessage(err))
+      setError(reportErrorMessage(err, 'map'))
     } finally {
       setVerifyingId(null)
     }
@@ -432,7 +432,7 @@ export default function MapBrowser() {
               <button
                 type="button"
                 onClick={() => setZoneFilter(null)}
-                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-ink/15 px-2.5 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-ink/5"
+                className="btn btn-outline h-10 gap-1.5 px-2.5 text-xs"
               >
                 {t('Clear zone filter')}
               </button>
@@ -476,7 +476,7 @@ export default function MapBrowser() {
                   <button
                     type="button"
                     onClick={() => focusReport(report)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-ink/15 px-3 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-ink/5"
+                    className="btn btn-outline px-3 text-xs"
                   >
                     <MapPin className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
                     {t('Show on map')}

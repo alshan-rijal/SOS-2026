@@ -2,7 +2,7 @@ import { AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/components/LanguageContext'
 
 export const inputClass =
-  'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-ink transition-colors placeholder:text-ink/40 focus:outline-none focus:ring-2'
+  'field w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-ink transition-colors placeholder:text-ink/40 focus:outline-none focus:ring-2'
 export const inputIdle = 'border-ink/15 focus:border-accent focus:ring-accent/30'
 export const inputInvalid = 'border-accent focus:border-accent focus:ring-accent/30'
 

@@ -9,7 +9,7 @@ import { useLanguage } from '@/components/LanguageContext'
 export { default as StatusBadge } from '@/components/StatusBadge'
 
 // One pill shape for every badge: same height, radius and font size.
-const BADGE = 'inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold'
+const BADGE = 'chip inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold'
 
 export function SeverityBadge({ severity, className = '' }) {
   const { lang } = useLanguage()

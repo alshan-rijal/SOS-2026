@@ -255,7 +255,16 @@ export const CANNOT_FIX_REASONS = [
  */
 export function isDbUpdateError(error) {
   const code = error?.code
-  return code === '42703' || code === '42P01' || code === 'PGRST205'
+  return code === '42703' || code === '42P01' || code === 'PGRST204' || code === 'PGRST205'
+}
+
+/**
+ * True when the database still has the pre-006 `report_status` enum, so a query
+ * filtering on a new value like 'reported' is rejected with 22P02. This is the
+ * same "database needs a migration" state and must fall back, not fail.
+ */
+export function isLegacyStatusError(error) {
+  return error?.code === '22P02' && /report_status/.test(error?.message ?? '')
 }
 
 /** The calm notice shown when admin features need the new SQL. */
@@ -450,10 +459,10 @@ export async function fetchReports(
   supabase,
   { search, category, status, severity, sort = 'newest', page = 1 } = {}
 ) {
-  const build = (publicOnly) => {
+  const build = (legacyStatus) => {
+    // Confidential reports are hidden by RLS (migration 007); no client-side
+    // filter is needed, and asking for the column would 400 before 007 exists.
     let query = supabase.from('reports').select(REPORT_SELECT, { count: 'exact' })
-    // Second layer under RLS: public lists never include confidential reports.
-    if (publicOnly) query = query.eq('is_confidential', false)
 
     const term = search ? sanitizeSearchTerm(search) : ''
     if (term) {
@@ -462,7 +471,11 @@ export async function fetchReports(
       )
     }
     if (category && category !== 'All') query = query.eq('category', category)
-    if (status && status !== 'all') query = query.in('status', statusAliasList(status))
+    if (status && status !== 'all') {
+      query = legacyStatus
+        ? query.eq('status', statusLegacyValue(status))
+        : query.in('status', statusAliasList(status))
+    }
     if (severity && severity !== 'all') query = query.eq('severity', severity)
 
     if (sort === 'oldest') {
@@ -477,8 +490,13 @@ export async function fetchReports(
     return query.range(from, from + PAGE_SIZE - 1)
   }
 
-  let { data, error, count } = await build(true)
-  if (error && isDbUpdateError(error)) ({ data, error, count } = await build(false))
+  let { data, error, count } = await build(false)
+  // Pre-006 enum: a filter on 'reported'/'fixed' is rejected; use the old value.
+  if (error && isLegacyStatusError(error)) {
+    const legacy = statusLegacyValue(status)
+    if (!legacy) return { rows: [], count: 0 }
+    ;({ data, error, count } = await build(true))
+  }
   if (error) throw error
 
   return { rows: data ?? [], count: count ?? 0 }
@@ -491,19 +509,23 @@ function statusAliasList(status) {
   return [status]
 }
 
-export async function fetchMapReports(supabase) {
-  const build = (publicOnly) => {
-    let query = supabase
-      .from('reports')
-      .select(REPORT_SELECT)
-      .order('created_at', { ascending: false })
-      .limit(500)
-    if (publicOnly) query = query.eq('is_confidential', false)
-    return query
-  }
+// The single-value twin on the pre-006 enum, or null when the old vocabulary has
+// no equivalent (under_verification, cannot_fix) — those match nothing.
+function statusLegacyValue(status) {
+  if (status === 'reported') return 'pending'
+  if (status === 'fixed') return 'resolved'
+  if (status === 'in_progress') return 'in_progress'
+  return null
+}
 
-  let { data, error } = await build(true)
-  if (error && isDbUpdateError(error)) ({ data, error } = await build(false))
+export async function fetchMapReports(supabase) {
+  // Confidential reports are hidden by RLS (migration 007); no client-side
+  // filter is needed, and asking for the column would 400 before 007 exists.
+  const { data, error } = await supabase
+    .from('reports')
+    .select(REPORT_SELECT)
+    .order('created_at', { ascending: false })
+    .limit(500)
   if (error) throw error
   return data ?? []
 }
@@ -511,17 +533,23 @@ export async function fetchMapReports(supabase) {
 export async function fetchReportStats(supabase) {
   const head = () => supabase.from('reports').select('id', { count: 'exact', head: true })
   // `.in` with both vocabularies keeps the count right before and after the
-  // workflow migration; a status that does not exist simply matches nothing.
-  const countFor = (statuses) => head().in('status', statuses)
+  // workflow migration. On the pre-006 enum the mix is rejected (22P02), so
+  // fall back to the legacy value; a new-only status counts zero.
+  const countFor = async (statuses, legacy) => {
+    if (legacy.length === 0) return { count: 0, error: null }
+    const res = await head().in('status', statuses)
+    if (res.error && isLegacyStatusError(res.error)) return head().in('status', legacy)
+    return res
+  }
 
   const [total, reported, underVerification, inProgress, fixed, cannotFix, categories] =
     await Promise.all([
       head(),
-      countFor(['reported', 'pending']),
-      countFor(['under_verification']),
-      countFor(['in_progress']),
-      countFor(['fixed', 'resolved']),
-      countFor(['cannot_fix']),
+      countFor(['reported', 'pending'], ['pending']),
+      countFor(['under_verification'], []),
+      countFor(['in_progress'], ['in_progress']),
+      countFor(['fixed', 'resolved'], ['resolved']),
+      countFor(['cannot_fix'], []),
       supabase.from('report_category_counts').select('category,count'),
     ])
 
@@ -867,29 +895,80 @@ export function initialsOf(name, fallback = '?') {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
 
-// Friendly wording for Supabase/PostgREST failures instead of raw error text.
-export function reportErrorMessage(error) {
-  if (process.env.NODE_ENV === 'development') {
-    console.error('[Supabase Error]', {
-      code: error?.code,
-      message: error?.message,
-      details: error?.details,
-      hint: error?.hint,
-    })
+// True for a browser network failure (offline, DNS, CORS) rather than a
+// PostgREST response. fetch rejects with a TypeError, so matching on that keeps
+// a genuine server message out of the "check your connection" bucket.
+export function isNetworkError(error) {
+  if (!error) return false
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
+  const message = typeof error === 'string' ? error : error?.message
+  return error?.name === 'TypeError' && /fetch|network|load failed/i.test(message ?? '')
+}
+
+/**
+ * Log a Supabase failure without ever printing an empty object.
+ *
+ * The previous logger built a fresh `{ code, message, details, hint }` object,
+ * so any thrown value without those fields — a string, a plain Error, a bare
+ * object — serialised to `{}` and hid the real cause. Log the fields as
+ * separate arguments; when there is nothing structured to log, dump what the
+ * value actually has plus its type.
+ */
+export function logSupabaseError(context, error) {
+  const code = error?.code
+  const message = error?.message
+  if (code || message) {
+    console.error('[Supabase]', context, code, message, error?.details, error?.hint, error)
+    return
   }
+  let dumped
+  try {
+    dumped = JSON.stringify(error, Object.getOwnPropertyNames(error ?? {}))
+  } catch {
+    dumped = String(error)
+  }
+  console.error('[Supabase]', context, dumped, typeof error)
+}
+
+/** The raw error as a short dev-only string, for an error card's detail line. */
+export function errorDetail(error) {
+  if (process.env.NODE_ENV !== 'development' || error == null || error === '') return ''
+  if (typeof error === 'string') return error
+  if (error instanceof Error) return `${error.name}: ${error.message}`
+  try {
+    return JSON.stringify(error, Object.getOwnPropertyNames(error))
+  } catch {
+    return String(error)
+  }
+}
+
+// Friendly wording for Supabase/PostgREST failures instead of raw error text.
+// `context` names the failing request so the log line points at the caller.
+export function reportErrorMessage(error, context = 'request') {
+  logSupabaseError(context, error)
 
   const code = error?.code
+  const status = error?.status
+  const rawMessage = typeof error === 'string' ? error : error?.message
   const devDetail =
-    process.env.NODE_ENV === 'development' && error?.message ? ` (${error.message})` : ''
+    process.env.NODE_ENV === 'development' && rawMessage ? ` (${rawMessage})` : ''
 
-  if (code === '42P01' || code === 'PGRST205') {
-    return `The reports database is not set up yet. Apply supabase/schema.sql in Supabase.${devDetail}`
+  if (isDbUpdateError(error) || isLegacyStatusError(error)) {
+    return `${DB_UPDATE_NOTICE}${devDetail}`
   }
-  if (code === '42501' || code === 'PGRST301' || error?.status === 401 || error?.status === 403) {
+  if (code === '42501' || code === 'PGRST301' || status === 401 || status === 403) {
     return `You do not have permission to do that. Sign in and try again.${devDetail}`
+  }
+  if (isNetworkError(error)) {
+    return `Could not reach the server. Check your connection and try again.${devDetail}`
   }
   if (code === '23514' || code === '23502') {
     return `Some report details were rejected. Check the values and try again.${devDetail}`
   }
   return `Unable to load reports. Please try again.${devDetail}`
+}
+
+/** `{ message, detail }` for an error card: friendly copy plus a dev-only line. */
+export function describeError(error, context = 'request') {
+  return { message: reportErrorMessage(error, context), detail: errorDetail(error) }
 }
