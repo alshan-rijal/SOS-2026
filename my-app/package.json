@@ -2,6 +2,14 @@
   "name": "my-app",
   "version": "0.1.0",
   "private": true,
+  "description": "A community problem-reporting platform: residents report local infrastructure\r problems (potholes, drainage, waste, water, streetlights), confirm each other's\r reports, and follow every problem from *pending* to *resolved* on a live map.",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "proxy.js",
+  "directories": {
+    "lib": "lib"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

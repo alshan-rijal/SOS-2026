@@ -155,7 +155,9 @@ export function normalizeReport(row, verifiedIds) {
     id: row.id,
     userId: row.user_id,
     title: row.title,
+    title_ne: row.title_ne ?? '',
     description: row.description ?? '',
+    description_ne: row.description_ne ?? '',
     category: row.category,
     severity: row.severity,
     status: row.status,
@@ -522,6 +524,20 @@ export async function fetchSimilarReports(supabase, report, limit = 3) {
     .slice(0, limit)
 }
 
+/** Fetch all reports and aggregate KPIs for /admin-panel. */
+export async function fetchAdminAnalytics(supabase) {
+  const [{ data: reports, error }, stats] = await Promise.all([
+    supabase
+      .from('reports')
+      .select(REPORT_SELECT)
+      .order('created_at', { ascending: false }),
+    fetchReportStats(supabase),
+  ])
+
+  if (error) throw error
+  return { reports: reports ?? [], stats }
+}
+
 // ---------------------------------------------------------------------------
 // Writes
 // ---------------------------------------------------------------------------
@@ -550,6 +566,12 @@ export async function updateReportStatus(supabase, reportId, status, note) {
     .eq('id', reportId)
   if (error) throw error
   await addStatusHistory(supabase, reportId, status, note)
+}
+
+/** Permanently delete a report (restricted to admins via RLS). */
+export async function deleteReport(supabase, reportId) {
+  const { error } = await supabase.from('reports').delete().eq('id', reportId)
+  if (error) throw error
 }
 
 export async function setVerification(supabase, reportId, userId, verified) {
@@ -674,15 +696,27 @@ export function initialsOf(name, fallback = '?') {
 
 // Friendly wording for Supabase/PostgREST failures instead of raw error text.
 export function reportErrorMessage(error) {
+  if (process.env.NODE_ENV === 'development') {
+    console.error('[Supabase Error]', {
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+    })
+  }
+
   const code = error?.code
+  const devDetail =
+    process.env.NODE_ENV === 'development' && error?.message ? ` (${error.message})` : ''
+
   if (code === '42P01' || code === 'PGRST205') {
-    return 'The reports database is not set up yet. Apply supabase/schema.sql in Supabase.'
+    return `The reports database is not set up yet. Apply supabase/schema.sql in Supabase.${devDetail}`
   }
   if (code === '42501' || code === 'PGRST301' || error?.status === 401 || error?.status === 403) {
-    return 'You do not have permission to do that. Sign in and try again.'
+    return `You do not have permission to do that. Sign in and try again.${devDetail}`
   }
   if (code === '23514' || code === '23502') {
-    return 'Some report details were rejected. Check the values and try again.'
+    return `Some report details were rejected. Check the values and try again.${devDetail}`
   }
-  return 'Unable to load reports. Please try again.'
+  return `Unable to load reports. Please try again.${devDetail}`
 }
