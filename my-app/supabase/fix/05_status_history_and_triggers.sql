@@ -7,18 +7,18 @@
 --                    create or replace, drop trigger/policy if exists.
 
 -- ---------------------------------------------------------------------------
--- profiles.role in ('user','admin') and public.is_admin()
+-- profiles.role in ('citizen','admin') and public.is_admin()
 -- ---------------------------------------------------------------------------
-alter table public.profiles add column if not exists role text not null default 'user';
+alter table public.profiles add column if not exists role text not null default 'citizen';
 
 -- Normalise the old 'citizen' label before the new check is added.
-update public.profiles set role = 'user' where role = 'citizen';
-alter table public.profiles alter column role set default 'user';
+update public.profiles set role = 'citizen' where role = 'citizen';
+alter table public.profiles alter column role set default 'citizen';
 
 -- Replace the old check (citizen/admin) with user/admin.
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles
-  add constraint profiles_role_check check (role in ('user', 'admin'));
+  add constraint profiles_role_check check (role in ('citizen', 'admin'));
 
 -- security definer so a policy reading profiles cannot recurse through profiles RLS.
 create or replace function public.is_admin()
