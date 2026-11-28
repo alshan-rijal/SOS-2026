@@ -5,7 +5,7 @@
   "description": "A community problem-reporting platform: residents report local infrastructure\r problems (potholes, drainage, waste, water, streetlights), confirm each other's\r reports, and follow every problem from *pending* to *resolved* on a live map.",
   "license": "ISC",
   "author": "",
-  "type": "commonjs",
+  "type": "module",
   "main": "proxy.js",
   "directories": {
     "lib": "lib"
@@ -25,7 +25,8 @@
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "recharts": "^3.11.2"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
