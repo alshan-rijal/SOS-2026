@@ -206,8 +206,10 @@ export default function EventForm() {
     let active = true
     Promise.resolve()
       .then(() => getEvent(editId))
-      .then((event) => {
-        if (!active || !event) return
+      .then(({ event, error, notFound }) => {
+        if (!active) return
+        if (error) throw error
+        if (notFound || !event) throw new Error('That event could not be found.')
         setForm({
           type: event.type,
           title: event.title,

@@ -45,6 +45,10 @@ function client() {
   return createClient()
 }
 
+// Supabase event ids are uuids. A malformed id can never match a row, so treat
+// it as not-found instead of letting PostgREST reject the query with a 400.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 async function currentUserId() {
   const { data } = await client().auth.getUser()
   return data?.user?.id ?? null
@@ -104,7 +108,7 @@ function normalize(row, userId, goingCount = 0, joined = false) {
       .sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '')),
     goingCount,
     joined,
-    isOrganiser: Boolean(userId && row.organizer_id === userId),
+    isOrganiser: Boolean(userId && String(row.organizer_id) === String(userId)),
     sample: false,
   }
 }
@@ -163,17 +167,45 @@ export async function listEvents(filters = {}) {
   return rows.map((row) => normalize(row, userId, counts.get(row.id) ?? 0, joined.has(row.id)))
 }
 
+/** True when the signed-in user's profile role is 'admin'. */
+async function isAdminUser(userId) {
+  if (!userId) return false
+  const { data } = await client().from('profiles').select('role').eq('id', userId).maybeSingle()
+  return data?.role === 'admin'
+}
+
+/**
+ * The one visibility rule, evaluated against RLS-visible rows: approved is
+ * public, the organiser sees their own in any status, admins see everything.
+ * Returns `{ event, error, notFound }` — `error` is a real failure, `notFound`
+ * is a genuine miss or a row this viewer may not see. Ids compare as strings.
+ */
 export async function getEvent(id) {
-  const userId = await currentUserId()
-  const { data, error } = await client().from('events').select(EVENT_COLUMNS).eq('id', id).maybeSingle()
-  if (error) throw error
-  if (!data) return null
-  const isOrganiser = Boolean(userId && data.organizer_id === userId)
-  const [{ counts, joined }, privateBits] = await Promise.all([
-    participationFor([id], userId),
-    isOrganiser ? ownerPrivateBits(id) : Promise.resolve({}),
-  ])
-  return normalize({ ...data, ...privateBits }, userId, counts.get(id) ?? 0, joined.has(id))
+  try {
+    const userId = await currentUserId()
+    if (!UUID_RE.test(id)) return { event: null, error: null, notFound: true, viewerId: userId }
+    const { data, error } = await client()
+      .from('events')
+      .select(EVENT_COLUMNS)
+      .eq('id', id)
+      .maybeSingle()
+    if (error) return { event: null, error, notFound: false, viewerId: userId }
+    if (!data) return { event: null, error: null, notFound: true, viewerId: userId }
+
+    const isOrganiser = Boolean(userId && String(data.organizer_id) === String(userId))
+    const reviewMode = !isOrganiser && data.status !== 'approved'
+    const isAdmin = reviewMode ? await isAdminUser(userId) : false
+    if (reviewMode && !isAdmin) return { event: null, error: null, notFound: true, viewerId: userId }
+
+    const [{ counts, joined }, privateBits] = await Promise.all([
+      participationFor([id], userId),
+      isOrganiser || isAdmin ? ownerPrivateBits(id) : Promise.resolve({}),
+    ])
+    const event = normalize({ ...data, ...privateBits }, userId, counts.get(id) ?? 0, joined.has(id))
+    return { event: { ...event, isAdmin }, error: null, notFound: false, viewerId: userId }
+  } catch (err) {
+    return { event: null, error: err, notFound: false, viewerId: null }
+  }
 }
 
 export async function listMyEvents() {

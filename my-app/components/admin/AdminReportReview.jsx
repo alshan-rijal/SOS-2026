@@ -10,6 +10,7 @@ import {
   ALL_STATUSES,
   CANNOT_FIX_REASONS,
   STATUS_CONFIG,
+  STATUS_WORKFLOW_UPDATE_NOTICE,
   categoryLabel,
   deleteReport,
   describeError,
@@ -23,6 +24,7 @@ import {
   shortId,
   signedImageUrl,
   statusLabel,
+  statusWorkflowReady,
   updateReportStatus,
 } from '@/lib/reports'
 import { logAdminAction } from '@/lib/admin'
@@ -57,6 +59,7 @@ export default function AdminReportReview({ reportId }) {
   const [error, setError] = useState(null)
   const [dbStale, setDbStale] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [workflowReady, setWorkflowReady] = useState(null)
 
   // Dialog state
   const [statusModal, setStatusModal] = useState(null) // target status or null
@@ -72,11 +75,13 @@ export default function AdminReportReview({ reportId }) {
     setLoading(true)
     setError(null)
     try {
-      const [result, nextHistory] = await Promise.all([
+      const [result, nextHistory, ready] = await Promise.all([
         fetchReport(supabase, reportId),
         fetchReportHistory(supabase, reportId),
+        statusWorkflowReady(supabase),
       ])
       if (guard?.cancelled) return
+      setWorkflowReady(ready)
       if (!result.row) {
         setReport(null)
         return
@@ -369,9 +374,13 @@ export default function AdminReportReview({ reportId }) {
             <h2 className="text-sm font-bold text-ink">{t('Update status')}</h2>
             <StatusStepper className="mt-4" status={report.status} history={history} reason={report.statusReason} changedByName={history.find((h) => h.toStatus === 'cannot_fix')?.changedByName || ''} />
 
+            {workflowReady === false ? (
+              <DbNotice className="mt-4" message={STATUS_WORKFLOW_UPDATE_NOTICE} />
+            ) : null}
+
             <div className="mt-5 flex flex-col gap-2">
               {nextStep ? (
-                <button type="button" onClick={() => openStatusModal(nextStep)} disabled={busy}
+                <button type="button" onClick={() => openStatusModal(nextStep)} disabled={busy || workflowReady !== true}
                   className="btn btn-primary px-4">
                   <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
                   {t('Move to')} {statusLabel(nextStep, lang)}
@@ -379,7 +388,7 @@ export default function AdminReportReview({ reportId }) {
               ) : null}
 
               {report.status !== 'cannot_fix' && report.status !== 'fixed' ? (
-                <button type="button" onClick={() => openStatusModal('cannot_fix')} disabled={busy}
+                <button type="button" onClick={() => openStatusModal('cannot_fix')} disabled={busy || workflowReady !== true}
                   className="btn btn-cta px-4">
                   <X className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
                   {t("Can't be fixed")}
@@ -388,7 +397,7 @@ export default function AdminReportReview({ reportId }) {
 
               <label className="mt-1 flex flex-col gap-1 text-xs font-semibold text-ink/60">
                 {t('Status')}
-                <select value="" onChange={(e) => e.target.value && openStatusModal(e.target.value)} disabled={busy}
+                <select value="" onChange={(e) => e.target.value && openStatusModal(e.target.value)} disabled={busy || workflowReady !== true}
                   className="h-10 rounded-xl border border-ink/15 bg-white px-3 text-sm text-ink focus:border-accent focus:outline-none">
                   <option value="">{t('Choose a reason')}</option>
                   {ALL_STATUSES.filter((s) => s !== report.status).map((s) => (

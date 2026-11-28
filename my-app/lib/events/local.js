@@ -282,8 +282,8 @@ function decorate(event, store, userId) {
   return {
     ...event,
     goingCount: goingFor(store, event.id),
-    joined: Boolean(userId && (store.participants[event.id] ?? []).some((p) => p.userId === userId)),
-    isOrganiser: Boolean(userId && event.organizerId === userId),
+    joined: Boolean(userId && (store.participants[event.id] ?? []).some((p) => String(p.userId) === String(userId))),
+    isOrganiser: Boolean(userId && String(event.organizerId) === String(userId)),
     history: store.history[event.id] ?? [],
   }
 }
@@ -362,9 +362,24 @@ export async function getEvent(id) {
   ensureSeeded()
   const store = readStore()
   const user = await currentUser()
-  const event = store.events.find((row) => row.id === id)
-  if (!event) return null
-  return decorate(event, store, user?.id ?? null)
+  const userId = user?.id ?? null
+  const event = store.events.find((row) => String(row.id) === String(id))
+  if (!event) {
+    // The event was created in another backend (or another browser's store).
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(
+        `[events/local] no event "${id}" in localStorage "${STORE_KEY}" (${store.events.length} stored)`
+      )
+    }
+    return { event: null, error: null, notFound: true, viewerId: userId }
+  }
+  const decorated = { ...decorate(event, store, userId), isAdmin: false }
+  // Same rule as the Supabase driver: approved is public, the organiser sees
+  // their own in any status. No admin concept exists locally.
+  if (event.status !== 'approved' && !decorated.isOrganiser) {
+    return { event: null, error: null, notFound: true, viewerId: userId }
+  }
+  return { event: decorated, error: null, notFound: false, viewerId: userId }
 }
 
 export async function listMyEvents() {

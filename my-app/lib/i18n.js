@@ -356,6 +356,13 @@ const NE_CORE = {
   'About this event': 'यो कार्यक्रमबारे',
   'Where and when': 'कहाँ र कहिले',
   'Back to events': 'कार्यक्रमहरूमा फर्कनुहोस्',
+  "We couldn't find this event": 'यो कार्यक्रम भेटिएन',
+  "It may have been removed, or it isn't public yet.":
+    'यो हटाइएको हुन सक्छ, वा अझै सार्वजनिक भएको छैन।',
+  'Events are not set up yet.': 'कार्यक्रमहरू अझै सेटअप गरिएका छैनन्।',
+  'No note was left.': 'कुनै टिप्पणी छोडिएको छैन।',
+  'Review only — admins cannot join or apply.':
+    'समीक्षा मात्र — एडमिनले सहभागी वा आवेदन गर्न सक्दैनन्।',
   'Map layers': 'नक्सा तहहरू',
   Details: 'विवरण',
   Upcoming: 'आउँदै',

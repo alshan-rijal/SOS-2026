@@ -26,6 +26,8 @@ export const NE_ADMIN = {
   'You are viewing the public site as an admin': 'तपाईं एडमिनको रूपमा सार्वजनिक साइट हेर्दै हुनुहुन्छ',
   Hide: 'लुकाउनुहोस्',
   'Admin features need a database update.': 'एडमिन सुविधाका लागि डाटाबेस अपडेट चाहिन्छ।',
+  'Status workflow needs a database update (run supabase/fix files).':
+    'स्थिति कार्यप्रवाहका लागि डाटाबेस अपडेट चाहिन्छ (supabase/fix फाइलहरू चलाउनुहोस्)।',
 
   // --- Admin sign in ------------------------------------------------------
   'Admin sign in': 'एडमिन साइन इन',

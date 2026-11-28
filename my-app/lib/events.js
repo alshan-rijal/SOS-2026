@@ -6,6 +6,7 @@
 
 import * as local from './events/local'
 import * as supabase from './events/supabase'
+import { logSupabaseError } from './reports.js'
 
 export const EVENTS_BACKEND = process.env.NEXT_PUBLIC_EVENTS_BACKEND === 'supabase' ? 'supabase' : 'local'
 
@@ -92,14 +93,17 @@ export function eventStatusMeta(status) {
 
 /** Friendly wording for a driver failure, and the not-set-up-yet case. */
 export function eventsErrorMessage(error) {
+  logSupabaseError('events', error)
   const code = error?.code
   if (code === '42P01' || code === 'PGRST205') {
-    return 'Events are not set up yet. Apply the files in supabase/migrations in Supabase.'
+    return 'Events are not set up yet.'
   }
   if (code === '42501' || code === 'PGRST301' || error?.status === 401 || error?.status === 403) {
     return 'You do not have permission to do that. Sign in and try again.'
   }
-  if (typeof error?.message === 'string' && error.message) return error.message
+  // App-thrown Errors carry a user-ready message; a coded database error does
+  // not, so never echo its Postgres text — the dev detail line shows it.
+  if (typeof error?.message === 'string' && error.message && !error?.code) return error.message
   return 'Unable to load events. Please try again.'
 }
 

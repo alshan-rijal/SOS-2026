@@ -20,7 +20,6 @@ import {
   CATEGORIES,
   ITAHARI_CENTER,
   SEVERITY_CONFIG,
-  addStatusHistory,
   categoryLabel,
   createReport,
   reportErrorMessage,
@@ -195,8 +194,6 @@ export default function ReportForm() {
         image_url: imageUrl,
         is_confidential: isConfidential,
       })
-
-      await addStatusHistory(supabase, reportId, 'reported', 'Report submitted.')
 
       router.push(`/reports/${reportId}?created=1`)
     } catch (err) {

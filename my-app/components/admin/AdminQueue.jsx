@@ -4,7 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Check, Copy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { categoryLabel, describeError, severityLabel, shortId, updateReportStatus } from '@/lib/reports'
+import {
+  STATUS_WORKFLOW_UPDATE_NOTICE,
+  categoryLabel,
+  describeError,
+  severityLabel,
+  shortId,
+  statusWorkflowReady,
+  updateReportStatus,
+} from '@/lib/reports'
 import { fetchQueue } from '@/lib/admin'
 import { formatDateTime, timeAgo } from '@/lib/format'
 import { SeverityBadge } from '@/components/Badges'
@@ -21,6 +29,7 @@ export default function AdminQueue() {
   const [busy, setBusy] = useState(null)
   const [error, setError] = useState(null)
   const [dbStale, setDbStale] = useState(false)
+  const [workflowReady, setWorkflowReady] = useState(null)
   const [sort, setSort] = useState('oldest')
 
   // `guard` is the effect's cancellation token: a late result from a page the
@@ -29,10 +38,14 @@ export default function AdminQueue() {
     setLoading(true)
     setError(null)
     try {
-      const { rows: next, dbStale: stale } = await fetchQueue(supabase, { sort })
+      const [{ rows: next, dbStale: stale }, ready] = await Promise.all([
+        fetchQueue(supabase, { sort }),
+        statusWorkflowReady(supabase),
+      ])
       if (guard?.cancelled) return
       setRows(next ?? [])
       setDbStale(Boolean(stale))
+      setWorkflowReady(ready)
     } catch (err) {
       if (!guard?.cancelled) setError(describeError(err, 'admin queue'))
     } finally {
@@ -50,9 +63,10 @@ export default function AdminQueue() {
 
   async function verify(row) {
     setBusy(row.id)
+    setError(null)
     try {
       await updateReportStatus(supabase, row.id, 'under_verification')
-      setRows((prev) => prev.filter((item) => item.id !== row.id))
+      await load()
     } catch (err) {
       setError(describeError(err, 'verify report'))
     } finally {
@@ -62,9 +76,10 @@ export default function AdminQueue() {
 
   async function rejectDuplicate(row) {
     setBusy(row.id)
+    setError(null)
     try {
       await updateReportStatus(supabase, row.id, 'cannot_fix', { reason: 'Duplicate report' })
-      setRows((prev) => prev.filter((item) => item.id !== row.id))
+      await load()
     } catch (err) {
       setError(describeError(err, 'reject duplicate'))
     } finally {
@@ -91,6 +106,7 @@ export default function AdminQueue() {
       </div>
 
       {dbStale ? <DbNotice /> : null}
+      {workflowReady === false ? <DbNotice message={STATUS_WORKFLOW_UPDATE_NOTICE} /> : null}
       {error ? <ErrorCard message={error.message} detail={error.detail} onRetry={load} /> : null}
 
       {loading ? (
@@ -115,11 +131,11 @@ export default function AdminQueue() {
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">
-                <button type="button" onClick={() => verify(row)} disabled={busy === row.id} aria-busy={busy === row.id}
+                <button type="button" onClick={() => verify(row)} disabled={busy === row.id || workflowReady !== true} aria-busy={busy === row.id}
                   className="btn btn-primary px-3.5">
                   {busy === row.id ? <span className="btn-spinner" aria-hidden="true" /> : <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />} {t('Verify')}
                 </button>
-                <button type="button" onClick={() => rejectDuplicate(row)} disabled={busy === row.id}
+                <button type="button" onClick={() => rejectDuplicate(row)} disabled={busy === row.id || workflowReady !== true}
                   className="btn btn-outline px-3.5">
                   <Copy className="h-4 w-4" strokeWidth={2.2} aria-hidden="true" /> {t('Reject as duplicate')}
                 </button>

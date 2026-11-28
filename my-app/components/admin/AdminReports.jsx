@@ -9,12 +9,14 @@ import {
   ALL_STATUSES,
   CATEGORIES,
   SEVERITY_ORDER,
+  STATUS_WORKFLOW_UPDATE_NOTICE,
   categoryLabel,
   describeError,
   fetchReportStats,
   severityLabel,
   shortId,
   statusLabel,
+  statusWorkflowReady,
   updateReportStatus,
 } from '@/lib/reports'
 import { fetchAdminReports } from '@/lib/admin'
@@ -59,6 +61,7 @@ export default function AdminReports({ confidentialOnly = false }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [dbStale, setDbStale] = useState(false)
+  const [workflowReady, setWorkflowReady] = useState(null)
   const [statusCounts, setStatusCounts] = useState(null)
   const [selected, setSelected] = useState(() => new Set())
   const [busy, setBusy] = useState(false)
@@ -133,6 +136,11 @@ export default function AdminReports({ confidentialOnly = false }) {
           fixed: stats.fixed,
           cannot_fix: stats.cannotFix,
         })
+      })
+      .catch(() => {})
+    statusWorkflowReady(supabase)
+      .then((ready) => {
+        if (active) setWorkflowReady(ready)
       })
       .catch(() => {})
     return () => {
@@ -215,6 +223,7 @@ export default function AdminReports({ confidentialOnly = false }) {
       ) : null}
 
       {dbStale ? <DbNotice /> : null}
+      {workflowReady === false ? <DbNotice message={STATUS_WORKFLOW_UPDATE_NOTICE} /> : null}
       {error ? <ErrorCard message={error.message} detail={error.detail} onRetry={load} /> : null}
 
       {/* Status chips with counts */}
@@ -302,7 +311,7 @@ export default function AdminReports({ confidentialOnly = false }) {
           <button
             type="button"
             onClick={bulkVerify}
-            disabled={busy}
+            disabled={busy || workflowReady !== true}
             aria-busy={busy}
             className="btn btn-primary px-3.5"
           >

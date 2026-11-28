@@ -270,6 +270,26 @@ export function isLegacyStatusError(error) {
 /** The calm notice shown when admin features need the new SQL. */
 export const DB_UPDATE_NOTICE = 'Admin features need a database update.'
 
+/** Shown when the status workflow itself is not ready yet (fix files not run). */
+export const STATUS_WORKFLOW_UPDATE_NOTICE =
+  'Status workflow needs a database update (run supabase/fix files).'
+
+/**
+ * True when the database accepts the new status workflow: the review column
+ * exists and the enum has a new value. A read cannot see the check constraint,
+ * but the column + value together catch every state before the fix has run. Any
+ * other failure (network) leaves the buttons enabled.
+ */
+export async function statusWorkflowReady(supabase) {
+  const { error } = await supabase
+    .from('reports')
+    .select('id,status_reason')
+    .in('status', ['under_verification'])
+    .limit(1)
+  if (!error) return true
+  return !(isDbUpdateError(error) || isLegacyStatusError(error))
+}
+
 export function hasCoords(report) {
   return (
     Number.isFinite(report.latitude) &&
@@ -735,23 +755,17 @@ export async function createReport(supabase, payload) {
   return data.id
 }
 
-export async function addStatusHistory(supabase, reportId, status, note) {
-  const insert = (value) =>
-    supabase.from('report_status_history').insert({ report_id: reportId, status: value, note: note || null })
-  let { error } = await insert(status)
-  if (error && error.code === '22P02') {
-    ;({ error } = await insert(status === 'reported' ? 'pending' : status))
-  }
-  if (error) throw error
-}
-
 /**
- * Move a report to a new status. The 006 trigger writes the history row, so the
- * app does not insert one here (that would duplicate it). `reason` is required by
- * the database for cannot_fix and for backward moves; `officialNote` is the public
- * note shown on the report page.
+ * Move a report to a new status. The database trigger writes the history row, so
+ * the app does not insert one here (that would duplicate it). `reason` is
+ * required by the database for cannot_fix and for backward moves; `officialNote`
+ * is the public note shown on the report page.
  *
- * The review columns only exist after migration 006, so a missing-column error
+ * `.select('id').single()` makes a write that changed nothing (RLS denied, or an
+ * empty result) an error instead of a silent no-op, so callers never show
+ * "Saved" for a row that was not updated.
+ *
+ * The review columns only exist after the fix files, so a missing-column error
  * retries with just the status.
  */
 export async function updateReportStatus(supabase, reportId, status, { reason, officialNote } = {}) {
@@ -759,26 +773,37 @@ export async function updateReportStatus(supabase, reportId, status, { reason, o
   if (reason) full.status_reason = reason
   if (officialNote) full.official_note = officialNote
 
-  let { error } = await supabase.from('reports').update(full).eq('id', reportId)
-  if (error && isDbUpdateError(error)) {
-    ;({ error } = await supabase.from('reports').update({ status }).eq('id', reportId))
-  }
+  const apply = (values) =>
+    supabase.from('reports').update(values).eq('id', reportId).select('id').single()
+
+  let { data, error } = await apply(full)
+  if (error && isDbUpdateError(error)) ({ data, error } = await apply({ status }))
   if (error) throw error
+  if (!data) throw new Error('The report was not updated. Check your permissions and try again.')
 }
 
 /** Flip the confidential flag (owner while reported, admins always — via RLS). */
 export async function setReportConfidential(supabase, reportId, isConfidential) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('reports')
     .update({ is_confidential: isConfidential })
     .eq('id', reportId)
+    .select('id')
+    .single()
   if (error) throw error
+  if (!data) throw new Error('The report was not updated. Check your permissions and try again.')
 }
 
 /** Permanently delete a report (restricted to admins via RLS). */
 export async function deleteReport(supabase, reportId) {
-  const { error } = await supabase.from('reports').delete().eq('id', reportId)
+  const { data, error } = await supabase
+    .from('reports')
+    .delete()
+    .eq('id', reportId)
+    .select('id')
+    .single()
   if (error) throw error
+  if (!data) throw new Error('The report was not deleted. Check your permissions and try again.')
 }
 
 export async function setVerification(supabase, reportId, userId, verified) {

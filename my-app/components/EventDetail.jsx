@@ -12,7 +12,6 @@ import {
   EyeOff,
   FileQuestion,
   MapPin,
-  RefreshCw,
   Users,
   Wrench,
 } from 'lucide-react'
@@ -29,6 +28,7 @@ import {
   listParticipants,
   reviewEvent,
 } from '@/lib/events'
+import { errorDetail } from '@/lib/reports'
 import { EventPhaseBadge, EventStatusBadge, SampleBadge } from '@/components/Badges'
 import EventTypeIcon, { eventTypeMeta } from '@/components/EventTypeIcon'
 import { useLanguage } from '@/components/LanguageContext'
@@ -36,6 +36,7 @@ import Avatar from '@/components/Avatar'
 import { Field, inputClass, inputIdle } from '@/components/Field'
 import EmptyState from '@/components/EmptyState'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import ErrorCard from '@/components/admin/ErrorCard'
 
 const ItahariMap = dynamic(() => import('@/components/ItahariMap'), {
   ssr: false,
@@ -150,28 +151,59 @@ function DevReviewPanel({ event, onReviewed }) {
   )
 }
 
+// Development only: one line per load naming the backend, the ids, the status
+// and the visibility decision. Nothing is logged in production.
+function devDecision(payload) {
+  if (process.env.NODE_ENV === 'production') return
+  console.info('[events] detail', { backend: EVENTS_BACKEND, ...payload })
+}
+
 export default function EventDetail() {
   const { id } = useParams()
   const { t, lang, localize } = useLanguage()
 
   const [event, setEvent] = useState(null)
+  const [notFound, setNotFound] = useState(false)
+  const [viewerId, setViewerId] = useState(null)
   const [participants, setParticipants] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
     try {
-      const row = await getEvent(id)
-      setEvent(row)
-      if (row) {
-        const people = await listParticipants(id).catch(() => [])
-        setParticipants(people)
+      const { event: row, error: err, notFound: missing, viewerId: viewer } = await getEvent(id)
+      setViewerId(viewer ?? null)
+      if (err) {
+        setEvent(null)
+        setNotFound(false)
+        setError({ message: eventsErrorMessage(err), detail: errorDetail(err) })
+        devDecision({ id, decision: 'error', viewer, code: err?.code })
+        return
       }
-      setError('')
+      if (missing || !row) {
+        setEvent(null)
+        setNotFound(true)
+        devDecision({ id, decision: 'not-found', viewer })
+        return
+      }
+      setNotFound(false)
+      setEvent(row)
+      devDecision({
+        id,
+        decision: row.status !== 'approved' ? 'show-with-banner' : 'show',
+        viewer,
+        organizerId: row.organizerId,
+        status: row.status,
+        isAdmin: row.isAdmin,
+      })
+      setParticipants(await listParticipants(id).catch(() => []))
     } catch (err) {
-      setError(eventsErrorMessage(err))
       setEvent(null)
+      setNotFound(false)
+      setError({ message: eventsErrorMessage(err), detail: errorDetail(err) })
     } finally {
       setIsLoading(false)
     }
@@ -182,50 +214,35 @@ export default function EventDetail() {
   }, [load])
 
   async function reload() {
-    setIsLoading(true)
     await load()
   }
 
-  async function handleJoin() {
-    if (!event) return
+  // Refresh in place after a write, without flashing the skeleton over the page.
+  async function refresh() {
+    const { event: row } = await getEvent(id)
+    if (row) {
+      setEvent(row)
+      setParticipants(await listParticipants(id).catch(() => []))
+    }
+  }
+
+  async function runWrite(action) {
+    if (!event || busy) return
     setBusy(true)
+    setError(null)
     try {
-      await joinEvent(event.id)
-      setEvent(await getEvent(event.id))
-      setParticipants(await listParticipants(event.id).catch(() => []))
+      await action(event.id)
+      await refresh()
     } catch (err) {
-      setError(eventsErrorMessage(err))
+      setError({ message: eventsErrorMessage(err), detail: errorDetail(err) })
     } finally {
       setBusy(false)
     }
   }
 
-  async function handleLeave() {
-    if (!event) return
-    setBusy(true)
-    try {
-      await leaveEvent(event.id)
-      setEvent(await getEvent(event.id))
-      setParticipants(await listParticipants(event.id).catch(() => []))
-    } catch (err) {
-      setError(eventsErrorMessage(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function handleCancel() {
-    if (!event) return
-    setBusy(true)
-    try {
-      await cancel(event.id)
-      setEvent(await getEvent(event.id))
-    } catch (err) {
-      setError(eventsErrorMessage(err))
-    } finally {
-      setBusy(false)
-    }
-  }
+  const handleJoin = () => runWrite(joinEvent)
+  const handleLeave = () => runWrite(leaveEvent)
+  const handleCancel = () => runWrite(cancel)
 
   if (isLoading) {
     return (
@@ -248,54 +265,46 @@ export default function EventDetail() {
   const crumbs = [
     { label: 'Dashboard', href: '/dashboard' },
     { label: 'Events', href: '/events' },
-    { label: event?.title || 'Event' },
+    { label: event ? localize(event, 'title') : 'Event' },
   ]
 
-  if (error && !event) {
+  if (error) {
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         <Breadcrumbs items={crumbs} />
-        <div className="flex flex-col items-start gap-3 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm font-medium text-ink">
-          <span className="flex items-start gap-2.5">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-            {error}
-          </span>
-          <button
-            type="button"
-            onClick={reload}
-            className="inline-flex items-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-accent/10"
-          >
-            <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
-            Try again
-          </button>
-        </div>
+        <ErrorCard message={error.message} detail={error.detail} onRetry={reload} />
       </div>
     )
   }
 
-  // Non-approved events are private: only the organiser sees them, everyone
-  // else gets the standard not-found state.
-  const isPrivate = event && event.status !== 'approved'
-  if (!event || (isPrivate && !event.isOrganiser)) {
+  // getEvent already hides anything this viewer may not see, so a miss here is a
+  // genuine not-found. The organiser and admins always get the row back.
+  if (notFound || !event) {
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         <Breadcrumbs items={crumbs} />
         <EmptyState
           icon={FileQuestion}
-          title="Event not found"
-          description="This event may have been removed, is not approved yet, or the link is incorrect."
+          title="We couldn't find this event"
+          description="It may have been removed, or it isn't public yet."
           action={
-            <Link
-              href="/events"
-              className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-accent/90"
-            >
-              Back to events
-            </Link>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Link href="/events" className="btn btn-cta px-4">
+                {t('Back to events')}
+              </Link>
+              {viewerId ? (
+                <Link href="/profile" className="btn btn-outline px-4">
+                  {t('My events')}
+                </Link>
+              ) : null}
+            </div>
           }
         />
       </div>
     )
   }
+
+  const isPrivate = event.status !== 'approved'
 
   const meta = eventTypeMeta(event.type)
   const phase = eventPhase(event)
@@ -313,7 +322,20 @@ export default function EventDetail() {
       {isPrivate ? (
         <div className="flex items-start gap-2.5 rounded-xl border border-ink/20 bg-ink/5 p-4 text-sm font-medium text-ink">
           <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-ink/60" strokeWidth={2.2} aria-hidden="true" />
-          Not public yet — only you can see this. It appears on Events once an admin approves it.
+          {event.isAdmin
+            ? 'Not public yet — you are viewing this as an admin.'
+            : 'Not public yet — only you can see this. It appears on Events once an admin approves it.'}
+        </div>
+      ) : null}
+
+      {event.status === 'changes_requested' || event.status === 'rejected' ? (
+        <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-ink">
+          <p className="font-semibold">
+            {event.status === 'rejected' ? t('Rejected') : t('Changes requested')}
+          </p>
+          <p className="mt-1 text-ink/80">
+            {event.reviewNotes || event.rejectionReason || t('No note was left.')}
+          </p>
         </div>
       ) : null}
 
@@ -343,12 +365,7 @@ export default function EventDetail() {
         </div>
       </section>
 
-      {error ? (
-        <div className="flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm font-medium text-ink">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          {error}
-        </div>
-      ) : null}
+      {error ? <ErrorCard message={error.message} detail={error.detail} /> : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-8">
@@ -432,7 +449,11 @@ export default function EventDetail() {
 
         <aside className="space-y-6 lg:col-span-4">
           <SectionCard title="Joining">
-            {event.isOrganiser ? (
+            {event.isAdmin ? (
+              <p className="rounded-lg bg-ink/5 px-3 py-2.5 text-center text-sm font-semibold text-ink/70">
+                {t('Review only — admins cannot join or apply.')}
+              </p>
+            ) : event.isOrganiser ? (
               <div className="space-y-4">
                 <p className="rounded-lg bg-surface px-3 py-2.5 text-center text-sm font-semibold text-ink">
                   You are organising
