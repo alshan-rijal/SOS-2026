@@ -7,10 +7,12 @@ import { AlertCircle, CircleCheck, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import TextField from '@/components/Field'
 import OAuthButtons from '@/components/OAuthButtons'
+import { useLanguage } from '@/components/LanguageContext'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function RegisterForm() {
+  const { t } = useLanguage()
   const router = useRouter()
   const supabase = createClient()
 
@@ -72,42 +74,42 @@ export default function RegisterForm() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-ink">Create account</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-ink">{t('Create account')}</h1>
       <p className="mt-1.5 text-sm text-ink/60">
-        An account lets you report problems and verify reports near you.
+        {t('An account lets you report problems and verify reports near you.')}
       </p>
 
       {serverError ? (
         <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-3.5 text-sm text-ink">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          {serverError}
+          {t(serverError)}
         </div>
       ) : null}
 
       {successMessage ? (
         <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-ink/20 bg-ink/5 p-3.5 text-sm text-ink">
           <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          {successMessage}
+          {t(successMessage)}
         </div>
       ) : null}
 
       <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-4">
         <TextField
           id="fullName"
-          label="Full name"
+          label={t('Full name')}
           autoComplete="name"
           value={fullName}
           onChange={(event) => {
             setFullName(event.target.value)
             if (errors.fullName) setErrors((previous) => ({ ...previous, fullName: '' }))
           }}
-          placeholder="Your name"
-          error={errors.fullName}
+          placeholder={t('Your name')}
+          error={t(errors.fullName)}
         />
 
         <TextField
           id="email"
-          label="Email address"
+          label={t('Email address')}
           type="email"
           autoComplete="email"
           value={email}
@@ -116,12 +118,12 @@ export default function RegisterForm() {
             if (errors.email) setErrors((previous) => ({ ...previous, email: '' }))
           }}
           placeholder="you@example.com"
-          error={errors.email}
+          error={t(errors.email)}
         />
 
         <div>
           <label htmlFor="password" className="mb-1.5 block text-sm font-semibold text-ink">
-            Password
+            {t('Password')}
           </label>
           <div className="relative">
             <input
@@ -133,7 +135,7 @@ export default function RegisterForm() {
                 setPassword(event.target.value)
                 if (errors.password) setErrors((previous) => ({ ...previous, password: '' }))
               }}
-              placeholder="At least 8 characters"
+              placeholder={t('At least 8 characters')}
               aria-invalid={Boolean(errors.password)}
               aria-describedby={errors.password ? 'password-error' : 'password-hint'}
               className={`w-full rounded-lg border bg-white px-3.5 py-2.5 pr-11 text-sm text-ink transition-colors placeholder:text-ink/40 focus:outline-none focus:ring-2 ${
@@ -145,7 +147,7 @@ export default function RegisterForm() {
             <button
               type="button"
               onClick={() => setShowPassword((visible) => !visible)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-label={showPassword ? t('Hide password') : t('Show password')}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-ink/50 transition-colors hover:bg-ink/5 hover:text-ink"
             >
               {showPassword ? (
@@ -158,11 +160,11 @@ export default function RegisterForm() {
           {errors.password ? (
             <p id="password-error" className="mt-1.5 flex items-center gap-1.5 text-xs text-ink">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
-              {errors.password}
+              {t(errors.password)}
             </p>
           ) : (
             <p id="password-hint" className="mt-1.5 text-xs text-ink/50">
-              At least 8 characters, with a number and a symbol.
+              {t('At least 8 characters, with a number and a symbol.')}
             </p>
           )}
         </div>
@@ -172,22 +174,22 @@ export default function RegisterForm() {
           disabled={isLoading}
           className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isLoading ? 'Creating account…' : 'Create account'}
+          {isLoading ? t('Creating account…') : t('Create account')}
         </button>
       </form>
 
       <OAuthButtons onError={setServerError} />
 
       <p className="mt-6 text-center text-sm text-ink/60">
-        Already have an account?{' '}
+        {t('Already have an account?')}{' '}
         <Link href="/login" className="font-semibold text-ink hover:underline">
-          Sign in
+          {t('Sign in')}
         </Link>
       </p>
 
       <p className="mt-3 text-center text-sm">
         <Link href="/" className="text-ink/50 transition-colors hover:text-ink">
-          Back to home
+          {t('Back to home')}
         </Link>
       </p>
     </div>

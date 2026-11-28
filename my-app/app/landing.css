@@ -1,0 +1,680 @@
+/* ---------------------------------------------------------------------------
+   Landing page only. Loaded from app/page.js so the rest of the app keeps its
+   own stylesheet. The four palette colours (surface #eaf4fb, ink #0b4a6f,
+   accent #ff6b5a, white) are the only colours used; tints are rgba()/opacity
+   of those four.
+
+   Motion rule for the whole file: every animation lives inside a
+   `prefers-reduced-motion: no-preference` block, and anything that hides
+   content is gated on `.is-reveal-ready`, a class ScrollReveal only adds to
+   sections that are already below the fold. Without JS or with reduced motion
+   the page is simply visible.
+--------------------------------------------------------------------------- */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* One fluid container and one vertical rhythm for every section, at any width.
+   Shared with the header and footer, so it must keep this exact box. */
+.landing-container {
+  width: 100%;
+  max-width: 1760px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 3vw, 48px);
+}
+
+.landing-section {
+  padding-block: clamp(56px, 7vw, 112px);
+  /* Leave room for the sticky header when a #hash lands on a section. */
+  scroll-margin-top: 5rem;
+}
+
+/* Small caps label used above headlines. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(11, 74, 111, 0.6);
+}
+
+.eyebrow::before {
+  content: "";
+  width: 18px;
+  height: 2px;
+  border-radius: 9999px;
+  background: #ff6b5a;
+}
+
+/* Headline scale, one place for every section heading. */
+.display {
+  font-size: clamp(1.75rem, 3vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: #0b4a6f;
+}
+
+.display-xl {
+  font-size: clamp(2.25rem, 5.4vw, 4.25rem);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  color: #0b4a6f;
+}
+
+/* ---------------------------------------------------------------------------
+   Pill buttons — a rounded control with a circular arrow badge, the primary
+   form filled coral, the ghost form a hairline on white.
+--------------------------------------------------------------------------- */
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 6px 6px 6px 22px;
+  border-radius: 9999px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.btn-pill:hover {
+  transform: translateY(-2px);
+}
+
+.btn-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  flex: none;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-pill:hover .btn-pill-badge {
+  transform: translateX(3px);
+}
+
+.btn-pill-primary {
+  background: #ff6b5a;
+  color: #ffffff;
+  box-shadow: 0 10px 26px rgba(255, 107, 90, 0.32);
+}
+
+.btn-pill-primary:hover {
+  background: #ff5b47;
+}
+
+.btn-pill-primary .btn-pill-badge {
+  background: #ffffff;
+  color: #ff6b5a;
+}
+
+.btn-pill-ghost {
+  background: #ffffff;
+  color: #0b4a6f;
+  box-shadow: inset 0 0 0 1px rgba(11, 74, 111, 0.15);
+}
+
+.btn-pill-ghost:hover {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(11, 74, 111, 0.28);
+}
+
+.btn-pill-ghost .btn-pill-badge {
+  background: rgba(11, 74, 111, 0.06);
+  color: #0b4a6f;
+}
+
+/* ---------------------------------------------------------------------------
+   Hero — centred headline, pill actions, then the framed illustration with two
+   caption blocks beside it (stacked under it on small screens).
+--------------------------------------------------------------------------- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(56px, 8vw, 104px) clamp(48px, 6vw, 88px);
+}
+
+/* Soft coral/navy glow behind the headline. Pure decoration. */
+.hero::before,
+.hero::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  border-radius: 9999px;
+  filter: blur(70px);
+  pointer-events: none;
+}
+
+.hero::before {
+  top: -140px;
+  left: 50%;
+  width: min(720px, 90vw);
+  height: 520px;
+  transform: translateX(-56%);
+  background: rgba(255, 107, 90, 0.16);
+}
+
+.hero::after {
+  top: 80px;
+  right: -120px;
+  width: min(520px, 70vw);
+  height: 420px;
+  background: rgba(11, 74, 111, 0.1);
+}
+
+.hero-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.hero-lede {
+  margin-top: 18px;
+  max-width: 56ch;
+  font-size: clamp(0.95rem, 1.15vw, 1.125rem);
+  line-height: 1.65;
+  color: rgba(11, 74, 111, 0.72);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+/* Illustration plus its two caption blocks. */
+.hero-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  margin-top: clamp(36px, 5vw, 64px);
+}
+
+/* The illustration leads on small screens, with the captions under it. */
+.hero-stage > .hero-frame {
+  order: -1;
+}
+
+.hero-frame {
+  position: relative;
+  z-index: 1;
+  margin-inline: auto;
+  width: min(760px, 100%);
+  border-radius: 28px;
+  background: linear-gradient(180deg, #ffffff 0%, rgba(234, 244, 251, 0.7) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(11, 74, 111, 0.09),
+    0 40px 80px -32px rgba(11, 74, 111, 0.28);
+  padding: clamp(10px, 1.4vw, 18px);
+}
+
+.hero-caption {
+  display: flex;
+  gap: 12px;
+  text-align: left;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(6px);
+  box-shadow: inset 0 0 0 1px rgba(11, 74, 111, 0.09);
+  padding: 14px;
+}
+
+.hero-caption-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #0b4a6f;
+}
+
+.hero-caption-text {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: rgba(11, 74, 111, 0.62);
+}
+
+.hero-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.hero-reassurance {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 26px;
+  margin-top: clamp(28px, 3vw, 40px);
+}
+
+@media (min-width: 1100px) {
+  .hero-stage {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 24px;
+  }
+
+  .hero-stage > .hero-frame {
+    order: 0;
+  }
+
+  .hero-frame {
+    flex: none;
+  }
+
+  .hero-caption {
+    width: 210px;
+    flex: none;
+  }
+
+  /* The right block sits lower, like a caption under the product. */
+  .hero-stage > .hero-caption:last-child {
+    margin-bottom: 22px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Marquee — the problem cards drift left on their own. The track holds the set
+   twice, so translating it by exactly one set width loops seamlessly. Hover or
+   keyboard focus pauses it; with reduced motion it stops being a marquee and
+   becomes a normal horizontal scroll strip, so no card is ever unreachable.
+--------------------------------------------------------------------------- */
+.marquee {
+  position: relative;
+  margin-top: clamp(28px, 3vw, 44px);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
+}
+
+.marquee-track {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  width: max-content;
+}
+
+.marquee-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(340px, 76vw);
+  flex: none;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgba(11, 74, 111, 0.09),
+    0 18px 40px -26px rgba(11, 74, 111, 0.35);
+  padding: 22px;
+  transition:
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms ease;
+}
+
+.marquee-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 107, 90, 0.35),
+    0 26px 50px -26px rgba(11, 74, 111, 0.4);
+}
+
+.marquee-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(255, 107, 90, 0.14);
+  color: #ff6b5a;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .marquee {
+    overflow: hidden;
+  }
+
+  .marquee-track {
+    animation: marquee 46s linear infinite;
+  }
+
+  .marquee:hover .marquee-track,
+  .marquee:focus-within .marquee-track {
+    animation-play-state: paused;
+  }
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      /* Exactly one copy of the set. */
+      transform: translateX(calc(-50% - 10px));
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    overflow-x: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+    scrollbar-width: thin;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Bento feature grid — two wide cards and four standard ones fill a tidy
+   3-column rhythm on desktop, 2 columns on tablets, 1 on phones.
+--------------------------------------------------------------------------- */
+.bento {
+  display: grid;
+  gap: clamp(14px, 1.6vw, 22px);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 700px) {
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .bento {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .bento-wide {
+    grid-column: span 2;
+  }
+}
+
+.bento-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgba(11, 74, 111, 0.09),
+    0 18px 44px -30px rgba(11, 74, 111, 0.32);
+  padding: clamp(18px, 1.8vw, 26px);
+  transition:
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 240ms ease;
+}
+
+.bento-card:hover {
+  transform: translateY(-5px);
+  box-shadow:
+    inset 0 0 0 1px rgba(11, 74, 111, 0.14),
+    0 30px 60px -30px rgba(11, 74, 111, 0.4);
+}
+
+/* ---------------------------------------------------------------------------
+   Steps — numbered cards that share one connecting hairline on desktop.
+--------------------------------------------------------------------------- */
+.step-card {
+  position: relative;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgba(11, 74, 111, 0.09),
+    0 18px 44px -32px rgba(11, 74, 111, 0.3);
+  padding: clamp(20px, 2vw, 28px);
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.step-card:hover {
+  transform: translateY(-5px);
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 9999px;
+  background: #0b4a6f;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Live-proof numbers.
+--------------------------------------------------------------------------- */
+.stat-value {
+  font-size: clamp(2rem, 3.4vw, 3rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #0b4a6f;
+}
+
+/* "Recently resolved" row. The column count follows how many reports the
+   database actually returned, so one or two cards never leave an empty slot. */
+.recent-grid {
+  display: grid;
+  gap: clamp(16px, 2vw, 20px);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 640px) {
+  .recent-grid[data-count='1'] {
+    max-width: 420px;
+  }
+
+  .recent-grid[data-count='2'],
+  .recent-grid[data-count='3'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .recent-grid[data-count='2'] {
+    max-width: 880px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .recent-grid[data-count='3'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Closing call — an ink panel with a coral glow.
+--------------------------------------------------------------------------- */
+.cta-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 32px;
+  background: #0b4a6f;
+  padding: clamp(32px, 4vw, 64px);
+}
+
+.cta-panel::before {
+  content: "";
+  position: absolute;
+  right: -80px;
+  top: -120px;
+  width: 420px;
+  height: 420px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 107, 90, 0.45), transparent 68%);
+  pointer-events: none;
+}
+
+/* Inverted variants. They sit after their base rules on purpose: these rules are
+   unlayered, so source order — not Tailwind's utility order — decides colour. */
+.display-invert {
+  color: #ffffff;
+}
+
+.eyebrow-invert {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* ---------------------------------------------------------------------------
+   Motion — reveals, stagger and the hero entrance.
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* Section fade for below-fold sections armed by ScrollReveal. */
+  .is-reveal-ready {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  .is-reveal-ready.is-visible {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 560ms ease,
+      transform 640ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Children of .stagger rise in one after another once the section is in.
+     Gated on .is-reveal-ready so an above-fold section is never hidden. */
+  .is-reveal-ready .stagger > * {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  .is-reveal-ready.is-visible .stagger > * {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 520ms ease,
+      transform 640ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .is-reveal-ready.is-visible .stagger > *:nth-child(2) {
+    transition-delay: 70ms;
+  }
+
+  .is-reveal-ready.is-visible .stagger > *:nth-child(3) {
+    transition-delay: 140ms;
+  }
+
+  .is-reveal-ready.is-visible .stagger > *:nth-child(4) {
+    transition-delay: 210ms;
+  }
+
+  .is-reveal-ready.is-visible .stagger > *:nth-child(5) {
+    transition-delay: 280ms;
+  }
+
+  .is-reveal-ready.is-visible .stagger > *:nth-child(6) {
+    transition-delay: 350ms;
+  }
+
+  /* The hero is above the fold, so it plays on load instead of on scroll. */
+  .hero-rise {
+    animation: hero-rise 760ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .hero-rise-1 {
+    animation-delay: 60ms;
+  }
+
+  .hero-rise-2 {
+    animation-delay: 140ms;
+  }
+
+  .hero-rise-3 {
+    animation-delay: 220ms;
+  }
+
+  .hero-rise-4 {
+    animation-delay: 320ms;
+  }
+
+  .hero-rise-5 {
+    animation-delay: 420ms;
+  }
+
+  @keyframes hero-rise {
+    from {
+      opacity: 0;
+      transform: translateY(22px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* The answer panel is mounted when its item opens, so a short fade-and-drop
+   plays on open. Collapsed panels leave the flow entirely (hidden attribute),
+   so this never runs on load. */
+@media (prefers-reduced-motion: no-preference) {
+  .faq-panel {
+    animation: faq-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes faq-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* Miniature product screens drawn inside the feature cards — no image files. */
+.mock-screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(11, 74, 111, 0.1);
+  background: #eaf4fb;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mock-ping {
+    animation: mock-ping 2200ms ease-out infinite;
+  }
+}
+
+@keyframes mock-ping {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}

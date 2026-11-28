@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { AlertCircle, CircleCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import TextField from '@/components/Field'
+import { useLanguage } from '@/components/LanguageContext'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function ForgotPasswordForm() {
+  const { t } = useLanguage()
   const supabase = createClient()
 
   const [email, setEmail] = useState('')
@@ -48,29 +50,29 @@ export default function ForgotPasswordForm() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-ink">Reset password</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-ink">{t('Reset password')}</h1>
       <p className="mt-1.5 text-sm text-ink/60">
-        Enter your email address and we&apos;ll send you a link to set a new password.
+        {t("Enter your email address and we'll send you a link to set a new password.")}
       </p>
 
       {serverError ? (
         <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-3.5 text-sm text-ink">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          {serverError}
+          {t(serverError)}
         </div>
       ) : null}
 
       {message ? (
         <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-ink/20 bg-ink/5 p-3.5 text-sm text-ink">
           <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          {message}
+          {t(message)}
         </div>
       ) : null}
 
       <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-4">
         <TextField
           id="email"
-          label="Email address"
+          label={t('Email address')}
           type="email"
           autoComplete="email"
           value={email}
@@ -79,7 +81,7 @@ export default function ForgotPasswordForm() {
             setFieldError('')
           }}
           placeholder="you@example.com"
-          error={fieldError}
+          error={t(fieldError)}
         />
 
         <button
@@ -87,13 +89,13 @@ export default function ForgotPasswordForm() {
           disabled={isLoading}
           className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isLoading ? 'Sending…' : 'Send reset link'}
+          {isLoading ? t('Sending…') : t('Send reset link')}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm">
         <Link href="/login" className="font-semibold text-ink hover:underline">
-          Back to sign in
+          {t('Back to sign in')}
         </Link>
       </p>
     </div>

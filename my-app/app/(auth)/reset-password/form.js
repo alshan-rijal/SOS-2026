@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { AlertCircle, CircleCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import TextField from '@/components/Field'
+import { useLanguage } from '@/components/LanguageContext'
 
 export default function ResetPasswordForm() {
+  const { t } = useLanguage()
   const supabase = createClient()
 
   // 'checking' until we know whether the recovery link produced a session.
@@ -56,22 +58,22 @@ export default function ResetPasswordForm() {
   if (sessionState === 'invalid') {
     return (
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Reset link expired</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">{t('Reset link expired')}</h1>
         <p className="mt-1.5 text-sm text-ink/60">
-          This password reset link is no longer valid. Request a new one to continue.
+          {t('This password reset link is no longer valid. Request a new one to continue.')}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
             href="/forgot-password"
             className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
           >
-            Request a new link
+            {t('Request a new link')}
           </Link>
           <Link
             href="/login"
             className="rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5"
           >
-            Back to sign in
+            {t('Back to sign in')}
           </Link>
         </div>
       </div>
@@ -81,16 +83,16 @@ export default function ResetPasswordForm() {
   if (isDone) {
     return (
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Password updated</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">{t('Password updated')}</h1>
         <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-ink/20 bg-ink/5 p-3.5 text-sm text-ink">
           <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          Your password has been changed. You can now use it to sign in.
+          {t('Your password has been changed. You can now use it to sign in.')}
         </div>
         <Link
           href="/dashboard"
           className="mt-6 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
         >
-          Go to dashboard
+          {t('Go to dashboard')}
         </Link>
       </div>
     )
@@ -98,22 +100,22 @@ export default function ResetPasswordForm() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-ink">Set a new password</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-ink">{t('Set a new password')}</h1>
       <p className="mt-1.5 text-sm text-ink/60">
-        Choose a new password for your account. You&apos;ll stay signed in.
+        {t("Choose a new password for your account. You'll stay signed in.")}
       </p>
 
       {serverError ? (
         <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-accent/40 bg-accent/10 p-3.5 text-sm text-ink">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2.2} aria-hidden="true" />
-          {serverError}
+          {t(serverError)}
         </div>
       ) : null}
 
       <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-4">
         <TextField
           id="password"
-          label="New password"
+          label={t('New password')}
           type="password"
           autoComplete="new-password"
           value={password}
@@ -121,8 +123,8 @@ export default function ResetPasswordForm() {
             setPassword(event.target.value)
             if (errors.password) setErrors({})
           }}
-          placeholder="At least 8 characters"
-          error={errors.password}
+          placeholder={t('At least 8 characters')}
+          error={t(errors.password)}
         />
         {/* Same minimum length as sign-up, enforced above. */}
         <button
@@ -130,13 +132,13 @@ export default function ResetPasswordForm() {
           disabled={isLoading}
           className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isLoading ? 'Updating…' : 'Update password'}
+          {isLoading ? t('Updating…') : t('Update password')}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm">
         <Link href="/login" className="font-semibold text-ink hover:underline">
-          Back to sign in
+          {t('Back to sign in')}
         </Link>
       </p>
     </div>
